@@ -102,7 +102,7 @@ export function createSettingsScreen(
           </section>`,
         footerHtml: renderSubBackFooter(),
       });
-      const syncSliderUi = (id: string, display: string): void => {
+      const syncSliderUi = (id: string, _display: string): void => {
         const input = root.querySelector(`#${id}`) as HTMLInputElement | null;
         const label = root.querySelector(`.cabinet-slider-value[data-for="${id}"]`);
         if (!input || !label) return;
