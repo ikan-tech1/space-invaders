@@ -73,6 +73,24 @@ Weights are per-pickup `weight` in `PICKUP_DEFS` (see `config.ts`). Armory-unloc
 
 Toast on pickup: `name — duration` via `pickupToastLine()`. HUD `#hud-buffs` shows active timed buffs and until-life-lost aegis/combo.
 
+### Pickup SFX
+
+| Category | Sound |
+|----------|-------|
+| curse | `pickupCurse` — low sawtooth |
+| economy / tokenBurst | `pickupEconomy` — rising sine chime |
+| rare | `pickupRare` — bright sine arpeggio |
+| default | `powerup` |
+
+### Magnet VFX
+
+When **Token Magnet** (armory upgrade) or **Magnet Burst** (run consumable) is active:
+
+- Pickups within ~92px pull toward the ship
+- Gold/cyan aura rings around the player
+- Spark particles trail from pulled pickups
+- Collection emits a burst + trail into the hull
+
 ### Collection feedback
 
 - Pickups within ~78px of the ship are magnet-pulled with cyan/category spark trails.
@@ -97,7 +115,7 @@ New challenge badges queue `og_pending_achievement_toasts` and replay as gold ac
 
 ## Slot machine
 
-Last-life reels use the same `PowerUpType` symbols; pool = `getAvailablePowerups()` (gated like field drops). Filler reels include volleyUp, fireRate, scatter, homing, comboAura, tokenBurst, hyperSpeed, invulnPulse.
+Last-life reels use the same `PowerUpType` symbols; pool = `getAvailablePowerups()` (gated like field drops). Filler reels include volleyUp, fireRate, scatter, homing, comboAura, tokenBurst, hyperSpeed, invulnPulse. Reel cells render **pixel canvas sprites** via `slotSymbolSprites.ts` (not text labels).
 
 ## Supply depot overlap
 

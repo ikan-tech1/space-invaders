@@ -107,6 +107,23 @@ export class CanvasRenderer {
     drawSprite(this.ctx, spriteKey, x - ox, y - oy, shipColor, 2);
   }
 
+  drawMagnetAura(x: number, y: number, active: boolean): void {
+    if (!active) return;
+    const pulse = 0.35 + Math.sin(Date.now() / 180) * 0.25;
+    const { ctx } = this;
+    ctx.save();
+    ctx.strokeStyle = `rgba(255, 210, 74, ${0.2 + pulse * 0.35})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y - 4, 38 + pulse * 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(0, 240, 255, ${0.15 + pulse * 0.25})`;
+    ctx.beginPath();
+    ctx.arc(x, y - 4, 52 + pulse * 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   drawBullets(bullets: Bullet[]): void {
     for (const b of bullets) {
       if (!b.active) continue;

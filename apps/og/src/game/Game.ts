@@ -1564,6 +1564,7 @@ export class Game {
     saveOgMeta(this.meta);
     this.callbacks.onTokensChange(this.meta.tokens);
     this.callbacks.onToast(`Daily: ${daily.title} — +${daily.tokenReward} ◎`);
+    queuePendingToast(`Daily complete: ${daily.title} — +${daily.tokenReward} ◎`);
     this.audio.play("secret");
   }
 
@@ -1577,6 +1578,9 @@ export class Game {
     renderer.drawBoss(this.boss);
     for (const p of this.powerUps) renderer.drawPowerUp(p);
     renderer.drawBullets(this.bullets);
+    const magnetActive =
+      this.meta.upgrades.includes("tokenMagnet") || this.magnetBurstActive;
+    renderer.drawMagnetAura(this.playerX, this.playerY, magnetActive);
     const ship = this.getShipProfile();
     renderer.drawPlayer(
       this.playerX,

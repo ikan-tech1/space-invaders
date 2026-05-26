@@ -1,4 +1,5 @@
 import type { AudioManager } from "../audio/AudioManager";
+import { mountSlotSymbolCanvases } from "./slotSymbolSprites";
 import {
   PICKUP_DEFS,
   POWERUP_LABELS,
@@ -157,6 +158,10 @@ function symbolClass(sym: ReelSymbol): string {
   return `${base} slot-symbol--cat-${cat}`;
 }
 
+function symbolCell(sym: ReelSymbol): string {
+  return `<span class="${symbolClass(sym)}"><canvas class="slot-symbol-canvas" width="40" height="40" data-slot-symbol="${sym}" aria-label="${symbolLabel(sym)}"></canvas></span>`;
+}
+
 function outcomeMessage(outcome: SlotOutcome): string {
   switch (outcome.type) {
     case "life":
@@ -251,12 +256,7 @@ export function showSlotMachine(
               <div class="slot-reel" data-reel="${i}">
                 <div class="slot-reel-window">
                   <div class="slot-reel-strip">
-                    ${strip
-                      .map(
-                        (sym) =>
-                          `<span class="${symbolClass(sym)}">${symbolLabel(sym)}</span>`
-                      )
-                      .join("")}
+                    ${strip.map((sym) => symbolCell(sym)).join("")}
                   </div>
                 </div>
               </div>`;
@@ -280,6 +280,8 @@ export function showSlotMachine(
       </footer>
     </div>
   `;
+
+  mountSlotSymbolCanvases(root);
 
   const spinBtn = root.querySelector<HTMLButtonElement>("#slot-spin")!;
   const continueBtn = root.querySelector<HTMLButtonElement>("#slot-continue")!;
