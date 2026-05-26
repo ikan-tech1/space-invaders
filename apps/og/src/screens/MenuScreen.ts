@@ -30,6 +30,36 @@ const DIFF_LABELS: Record<Difficulty, string> = {
   insane: "Insane",
 };
 
+const DIFF_DESCS: Record<Difficulty, string> = {
+  casual: "Relaxed pace · forgiving fire",
+  classic: "Original arcade balance",
+  insane: "Fast waves · lethal shots",
+};
+
+function renderMenuNavTile(opts: {
+  action: string;
+  icon: string;
+  title: string;
+  subtitle: string;
+  badge?: string;
+  extraClass?: string;
+  shortLabel?: string;
+}): string {
+  const badge = opts.badge
+    ? `<span class="arcade-panel-btn-badge">${opts.badge}</span>`
+    : "";
+  const label = opts.shortLabel ?? opts.title;
+  return `
+    <button type="button" class="arcade-panel-btn menu-nav-tile ${opts.extraClass ?? ""}" data-action="${opts.action}">
+      <span class="arcade-panel-btn-face">
+        <span class="arcade-panel-btn-icon" aria-hidden="true">${opts.icon}</span>
+        <span class="arcade-panel-btn-label">${label}</span>
+        <span class="arcade-panel-btn-sub">${opts.subtitle}</span>
+      </span>
+      ${badge}
+    </button>`;
+}
+
 export class MenuScreen implements Screen {
   id = "menu" as const;
   private eggs = new EasterEggRegistry();
@@ -58,95 +88,112 @@ export class MenuScreen implements Screen {
 
     root.innerHTML = `
       <div class="screen menu-screen">
-        <header class="arcade-hero menu-cabinet-wrap">
-          <div class="arcade-cabinet">
-            <div class="arcade-frame" aria-hidden="true">
-              <span class="arcade-corner arcade-corner-tl"></span>
-              <span class="arcade-corner arcade-corner-tr"></span>
-              <span class="arcade-corner arcade-corner-bl"></span>
-              <span class="arcade-corner arcade-corner-br"></span>
-              <span class="arcade-scanlines"></span>
-              <span class="arcade-glow"></span>
+        <div class="arcade-machine">
+          <div class="arcade-machine-bezel">
+            <span class="cabinet-bolt cabinet-bolt-tl" aria-hidden="true"></span>
+            <span class="cabinet-bolt cabinet-bolt-tr" aria-hidden="true"></span>
+            <span class="cabinet-bolt cabinet-bolt-bl" aria-hidden="true"></span>
+            <span class="cabinet-bolt cabinet-bolt-br" aria-hidden="true"></span>
+            <div class="cabinet-side-art cabinet-side-art--left" aria-hidden="true">
+              <span class="cabinet-side-art-glyph">▲</span>
+              <span class="cabinet-side-art-glyph">◆</span>
+              <span class="cabinet-side-art-glyph">▼</span>
             </div>
-            <div class="arcade-status" aria-hidden="true">
-              <span class="arcade-status-dot"></span>
-              <span>ARCADE ONLINE</span>
+            <div class="cabinet-side-art cabinet-side-art--right" aria-hidden="true">
+              <span class="cabinet-side-art-glyph">★</span>
+              <span class="cabinet-side-art-glyph">◎</span>
+              <span class="cabinet-side-art-glyph">☠</span>
             </div>
-            <div class="arcade-invaders arcade-invaders--march" data-invader-row aria-hidden="true" title="???">
-              <svg viewBox="0 0 88 12" width="88" height="12" focusable="false">
-                <g fill="currentColor">
-                  <rect x="2" y="2" width="2" height="2"/><rect x="6" y="0" width="2" height="2"/>
-                  <rect x="8" y="0" width="2" height="2"/><rect x="10" y="2" width="2" height="2"/>
-                  <rect x="0" y="4" width="14" height="2"/><rect x="2" y="6" width="2" height="2"/>
-                  <rect x="10" y="6" width="2" height="2"/><rect x="4" y="8" width="2" height="2"/>
-                  <rect x="8" y="8" width="2" height="2"/>
-                </g>
-                <g fill="currentColor" transform="translate(22 0)">
-                  <rect x="2" y="0" width="2" height="2"/><rect x="6" y="0" width="2" height="2"/>
-                  <rect x="10" y="0" width="2" height="2"/><rect x="0" y="2" width="2" height="2"/>
-                  <rect x="12" y="2" width="2" height="2"/><rect x="2" y="4" width="10" height="2"/>
-                  <rect x="0" y="6" width="4" height="2"/><rect x="10" y="6" width="4" height="2"/>
-                  <rect x="2" y="8" width="2" height="2"/><rect x="10" y="8" width="2" height="2"/>
-                </g>
-                <g fill="currentColor" transform="translate(44 0)">
-                  <rect x="4" y="0" width="6" height="2"/><rect x="2" y="2" width="2" height="2"/>
-                  <rect x="10" y="2" width="2" height="2"/><rect x="0" y="4" width="14" height="2"/>
-                  <rect x="2" y="6" width="2" height="2"/><rect x="10" y="6" width="2" height="2"/>
-                  <rect x="4" y="8" width="2" height="2"/><rect x="8" y="8" width="2" height="2"/>
-                </g>
-                <g fill="currentColor" transform="translate(66 0)">
-                  <rect x="2" y="0" width="10" height="2"/><rect x="0" y="2" width="2" height="2"/>
-                  <rect x="12" y="2" width="2" height="2"/><rect x="2" y="4" width="2" height="2"/>
-                  <rect x="6" y="4" width="2" height="2"/><rect x="10" y="4" width="2" height="2"/>
-                  <rect x="0" y="6" width="14" height="2"/><rect x="2" y="8" width="2" height="2"/>
-                  <rect x="10" y="8" width="2" height="2"/>
-                </g>
-              </svg>
-            </div>
-            <h1 class="arcade-title" id="menu-wordmark">
-              <span class="arcade-title-og">OG</span>
-              <span class="arcade-title-line">SPACE</span>
-              <span class="arcade-title-line arcade-title-line--glow">INVADERS</span>
-            </h1>
-            <p class="arcade-tagline">Classic Arcade Edition</p>
-            <div class="arcade-marquee menu-arcade-marquee" aria-hidden="true">
-              <span>1 CREDIT · <em class="menu-marquee-insert">INSERT COIN</em></span>
-            </div>
-            <div class="menu-hero-stage">
-              <button type="button" class="menu-hero-ship-btn" data-action="armory" aria-label="Open Armory to change ${shipProfile.name}">
-                <canvas class="menu-hero-ship" data-ship-hero width="140" height="84" aria-hidden="true"></canvas>
-                <span class="menu-hero-scanline" aria-hidden="true"></span>
-              </button>
-              <div class="menu-ship-caption">
-                <span class="menu-ship-name">${shipCaption}</span>
-                <span class="menu-ship-change">Change in Armory →</span>
+
+            <header class="cabinet-marquee" aria-label="Arcade marquee">
+              <div class="cabinet-marquee-top">
+                <div class="cabinet-coin-insert" aria-label="Coin slot">
+                  <span class="cabinet-coin-slot-rect" aria-hidden="true"></span>
+                  <span class="cabinet-coin-label">1 CREDIT</span>
+                </div>
+                <div class="arcade-status cabinet-marquee-status">
+                  <span class="arcade-status-dot"></span>
+                  <span>ONLINE</span>
+                </div>
+                <div class="menu-stat-ring menu-stat-ring--marquee menu-stat-ring--intro" aria-label="Challenge progress ${badgeCount} of ${challengeTotal}">
+                  <svg viewBox="0 0 64 64" class="menu-stat-ring-svg" aria-hidden="true">
+                    <circle class="menu-stat-ring-track" cx="32" cy="32" r="26" fill="none" stroke-width="4"/>
+                    <circle class="menu-stat-ring-fill" cx="32" cy="32" r="26" fill="none" stroke-width="4"
+                      stroke-dasharray="${(2 * Math.PI * 26).toFixed(1)}"
+                      stroke-dashoffset="${(2 * Math.PI * 26 * (1 - badgeCount / Math.max(challengeTotal, 1))).toFixed(1)}"
+                      style="--ring-offset: ${(2 * Math.PI * 26 * (1 - badgeCount / Math.max(challengeTotal, 1))).toFixed(1)}"/>
+                  </svg>
+                  <div class="menu-stat-ring-center">
+                    <span class="menu-stat-ring-value">${Math.round((badgeCount / Math.max(challengeTotal, 1)) * 100)}%</span>
+                    <span class="menu-stat-ring-label">Badges</span>
+                  </div>
+                </div>
               </div>
-              <button type="button" class="btn btn-menu-hangar" data-action="armory">
-                CHANGE SHIP
-              </button>
-            </div>
-            <div class="menu-cabinet-meta" aria-label="Arcade status">
-              <div class="menu-stat-ring menu-stat-ring--intro" aria-label="Challenge progress ${badgeCount} of ${challengeTotal}">
-                <svg viewBox="0 0 64 64" class="menu-stat-ring-svg" aria-hidden="true">
-                  <circle class="menu-stat-ring-track" cx="32" cy="32" r="26" fill="none" stroke-width="4"/>
-                  <circle class="menu-stat-ring-fill" cx="32" cy="32" r="26" fill="none" stroke-width="4"
-                    stroke-dasharray="${(2 * Math.PI * 26).toFixed(1)}"
-                    stroke-dashoffset="${(2 * Math.PI * 26 * (1 - badgeCount / Math.max(challengeTotal, 1))).toFixed(1)}"
-                    style="--ring-offset: ${(2 * Math.PI * 26 * (1 - badgeCount / Math.max(challengeTotal, 1))).toFixed(1)}"/>
+              <div class="arcade-invaders arcade-invaders--march" data-invader-row aria-hidden="true" title="???">
+                <svg viewBox="0 0 88 12" width="88" height="12" focusable="false">
+                  <g fill="currentColor">
+                    <rect x="2" y="2" width="2" height="2"/><rect x="6" y="0" width="2" height="2"/>
+                    <rect x="8" y="0" width="2" height="2"/><rect x="10" y="2" width="2" height="2"/>
+                    <rect x="0" y="4" width="14" height="2"/><rect x="2" y="6" width="2" height="2"/>
+                    <rect x="10" y="6" width="2" height="2"/><rect x="4" y="8" width="2" height="2"/>
+                    <rect x="8" y="8" width="2" height="2"/>
+                  </g>
+                  <g fill="currentColor" transform="translate(22 0)">
+                    <rect x="2" y="0" width="2" height="2"/><rect x="6" y="0" width="2" height="2"/>
+                    <rect x="10" y="0" width="2" height="2"/><rect x="0" y="2" width="2" height="2"/>
+                    <rect x="12" y="2" width="2" height="2"/><rect x="2" y="4" width="10" height="2"/>
+                    <rect x="0" y="6" width="4" height="2"/><rect x="10" y="6" width="4" height="2"/>
+                    <rect x="2" y="8" width="2" height="2"/><rect x="10" y="8" width="2" height="2"/>
+                  </g>
+                  <g fill="currentColor" transform="translate(44 0)">
+                    <rect x="4" y="0" width="6" height="2"/><rect x="2" y="2" width="2" height="2"/>
+                    <rect x="10" y="2" width="2" height="2"/><rect x="0" y="4" width="14" height="2"/>
+                    <rect x="2" y="6" width="2" height="2"/><rect x="10" y="6" width="2" height="2"/>
+                    <rect x="4" y="8" width="2" height="2"/><rect x="8" y="8" width="2" height="2"/>
+                  </g>
+                  <g fill="currentColor" transform="translate(66 0)">
+                    <rect x="2" y="0" width="10" height="2"/><rect x="0" y="2" width="2" height="2"/>
+                    <rect x="12" y="2" width="2" height="2"/><rect x="2" y="4" width="2" height="2"/>
+                    <rect x="6" y="4" width="2" height="2"/><rect x="10" y="4" width="2" height="2"/>
+                    <rect x="0" y="6" width="14" height="2"/><rect x="2" y="8" width="2" height="2"/>
+                    <rect x="10" y="8" width="2" height="2"/>
+                  </g>
                 </svg>
-                <div class="menu-stat-ring-center">
-                  <span class="menu-stat-ring-value">${Math.round((badgeCount / Math.max(challengeTotal, 1)) * 100)}%</span>
-                  <span class="menu-stat-ring-label">Badges</span>
-                </div>
               </div>
-              <div class="menu-credit-counter" aria-label="Arcade credits">
-                <span class="menu-credit-slot" aria-hidden="true"></span>
-                <div class="menu-credit-body">
-                  <span class="menu-credit-label">Credits</span>
-                  <span class="menu-credit-value">1</span>
+              <h1 class="arcade-title" id="menu-wordmark">
+                <span class="arcade-title-og">OG</span>
+                <span class="arcade-title-line">SPACE</span>
+                <span class="arcade-title-line arcade-title-line--glow">INVADERS</span>
+              </h1>
+              <p class="arcade-tagline">Classic Arcade Edition</p>
+              <div class="cabinet-marquee-ticker arcade-marquee menu-arcade-marquee" aria-hidden="true">
+                <span>1 CREDIT · <em class="menu-marquee-insert">INSERT COIN</em> · TO PLAY</span>
+              </div>
+            </header>
+
+            <div class="cabinet-crt-well">
+              <div class="cabinet-crt-bezel">
+                <div class="arcade-frame" aria-hidden="true">
+                  <span class="arcade-corner arcade-corner-tl"></span>
+                  <span class="arcade-corner arcade-corner-tr"></span>
+                  <span class="arcade-corner arcade-corner-bl"></span>
+                  <span class="arcade-corner arcade-corner-br"></span>
+                  <span class="arcade-scanlines"></span>
+                  <span class="arcade-glow"></span>
+                </div>
+                <div class="menu-hero-stage">
+                  <button type="button" class="menu-hero-ship-btn" data-action="armory" aria-label="Open Armory to change ${shipProfile.name}">
+                    <canvas class="menu-hero-ship" data-ship-hero width="140" height="84" aria-hidden="true"></canvas>
+                    <span class="menu-hero-scanline" aria-hidden="true"></span>
+                  </button>
+                  <div class="menu-ship-caption">
+                    <span class="menu-ship-name">${shipCaption}</span>
+                    <span class="menu-ship-change">Change in Armory →</span>
+                  </div>
                 </div>
               </div>
             </div>
+
             <div class="menu-stat-chips" aria-label="Player stats">
               <span class="menu-stat-chip">
                 <span class="menu-stat-chip-label">Tokens</span>
@@ -158,7 +205,7 @@ export class MenuScreen implements Screen {
               </span>
               <span class="menu-stat-chip menu-stat-chip--ship">
                 <span class="menu-stat-chip-label">Ship</span>
-                <span class="menu-stat-chip-value">${shipCaption}</span>
+                <span class="menu-stat-chip-value">${shipProfile.name}</span>
               </span>
               <span class="menu-stat-chip">
                 <span class="menu-stat-chip-label">Badges</span>
@@ -173,110 +220,134 @@ export class MenuScreen implements Screen {
                   : ""
               }
             </div>
-          </div>
-          <div class="menu-cabinet-base" aria-hidden="true">
-            <div class="menu-coin-slot">
-              <span class="menu-coin-slot-dot"></span>
-              <span class="menu-coin-slot-text">
-                <span class="menu-coin-slot-credit">1 CREDIT</span>
-                <span class="menu-coin-slot-sep" aria-hidden="true"> · </span>
-                <span class="menu-coin-slot-insert">INSERT COIN</span>
-                <span class="menu-coin-slot-sep" aria-hidden="true"> · </span>
-                <span class="menu-coin-slot-play">TO PLAY</span>
-              </span>
+
+            <div class="cabinet-control-panel">
+              <p class="cabinet-panel-label">Deploy</p>
+              <section class="cabinet-deploy-bank" aria-label="Play modes">
+                <button type="button" class="arcade-push-btn arcade-push-btn--gold btn btn-primary btn-deploy" data-action="campaign">
+                  <span class="arcade-push-btn-cap" aria-hidden="true"></span>
+                  <span class="btn-deploy-icon" aria-hidden="true">▶</span>
+                  <span class="btn-deploy-copy">
+                    <span class="btn-deploy-label">Campaign</span>
+                    <span class="btn-deploy-sub">12 levels · bosses every 3</span>
+                  </span>
+                </button>
+                ${
+                  saved || meta.endlessUnlocked
+                    ? `<div class="cabinet-deploy-secondary">
+                        ${
+                          saved
+                            ? `<button type="button" class="arcade-push-btn arcade-push-btn--pulse btn btn-resume btn-deploy" data-action="continue">
+                                <span class="arcade-push-btn-cap" aria-hidden="true"></span>
+                                <span class="btn-deploy-copy">
+                                  <span class="btn-deploy-label">Continue</span>
+                                  <span class="btn-deploy-sub">Level ${saved.wave} · ${saved.score.toLocaleString()} pts</span>
+                                </span>
+                              </button>`
+                            : ""
+                        }
+                        ${
+                          meta.endlessUnlocked
+                            ? `<button type="button" class="arcade-push-btn arcade-push-btn--cyan btn btn-endless btn-deploy" data-action="endless">
+                                <span class="arcade-push-btn-cap" aria-hidden="true"></span>
+                                <span class="btn-deploy-copy">
+                                  <span class="btn-deploy-label">Endless</span>
+                                  <span class="btn-deploy-sub">${endlessSub}</span>
+                                </span>
+                              </button>`
+                            : ""
+                        }
+                      </div>`
+                    : ""
+                }
+              </section>
+
+              <p class="cabinet-panel-label">Difficulty</p>
+              <div class="cabinet-dip-bank difficulty-toggle-group" role="radiogroup" aria-label="Difficulty">
+                ${(["casual", "classic", "insane"] as Difficulty[])
+                  .map(
+                    (d) => `
+                  <label class="dip-switch difficulty-toggle ${d === diff ? "selected" : ""}" data-diff="${d}">
+                    <input type="radio" name="diff" value="${d}" ${d === diff ? "checked" : ""} />
+                    <span class="dip-switch-housing">
+                      <span class="dip-switch-led" aria-hidden="true"></span>
+                      <span class="dip-switch-toggle" aria-hidden="true"></span>
+                    </span>
+                    <span class="dip-switch-label">${DIFF_LABELS[d].slice(0, 3).toUpperCase()}</span>
+                    <span class="dip-switch-desc">${DIFF_DESCS[d]}</span>
+                  </label>`
+                  )
+                  .join("")}
+              </div>
+
+              <nav class="cabinet-nav-bank menu-nav-grid" aria-label="Arcade menu">
+                ${renderMenuNavTile({
+                  action: "daily",
+                  icon: "☀",
+                  title: "Daily Ops",
+                  shortLabel: "Daily",
+                  subtitle: dailyDone ? "Complete" : "Live ops",
+                  badge: dailyDone ? "Done" : "Live",
+                  extraClass: `menu-nav-tile--daily ${dailyDone ? "menu-nav-tile--daily-done" : ""}`,
+                })}
+                ${renderMenuNavTile({
+                  action: "armory",
+                  icon: "⚔",
+                  title: "Armory",
+                  shortLabel: "Armory",
+                  subtitle: shipProfile.name,
+                })}
+                ${renderMenuNavTile({
+                  action: "challenges",
+                  icon: "◎",
+                  title: "Challenges",
+                  shortLabel: "Chall.",
+                  subtitle: "Trophies",
+                  badge: `${badgeCount}/${challengeTotal}`,
+                })}
+                ${renderMenuNavTile({
+                  action: "highscores",
+                  icon: "★",
+                  title: "High Scores",
+                  shortLabel: "Scores",
+                  subtitle: "Hall of fame",
+                })}
+                ${renderMenuNavTile({
+                  action: "modes",
+                  icon: "▦",
+                  title: "Game Modes",
+                  shortLabel: "Modes",
+                  subtitle: "Alt rules",
+                  badge: "Soon",
+                  extraClass: "menu-nav-tile--modes",
+                })}
+                ${renderMenuNavTile({
+                  action: "settings",
+                  icon: "⚙",
+                  title: "Settings",
+                  shortLabel: "Settings",
+                  subtitle: "Audio · controls",
+                })}
+              </nav>
+
+              <footer class="cabinet-placard">
+                <a class="link-neon cabinet-placard-link" href="https://neon-ikan-tech1.vercel.app" target="_blank" rel="noopener">
+                  Play NEON Siege 2050 →
+                </a>
+                <button type="button" class="cabinet-placard-howto" data-action="howto">How to Play</button>
+                <span class="cabinet-placard-serial">OG EDITION · v1.0 · SERIAL № OG-1978</span>
+              </footer>
             </div>
-            <div class="menu-cabinet-legs">
-              <span class="menu-cabinet-leg"></span>
-              <span class="menu-cabinet-leg"></span>
+          </div>
+
+          <div class="cabinet-base" aria-hidden="true">
+            <div class="cabinet-base-rail"></div>
+            <div class="cabinet-legs">
+              <span class="cabinet-leg"></span>
+              <span class="cabinet-leg"></span>
             </div>
           </div>
-        </header>
-
-        <section class="menu-deploy" aria-label="Play modes">
-          <button type="button" class="btn btn-primary btn-deploy" data-action="campaign">
-            <span class="btn-deploy-label">Campaign</span>
-            <span class="btn-deploy-sub">12 levels · bosses every 3</span>
-          </button>
-          ${
-            saved || meta.endlessUnlocked
-              ? `<div class="menu-secondary-actions">
-                  ${
-                    saved
-                      ? `<button type="button" class="btn btn-resume" data-action="continue">
-                          <span class="btn-deploy-label">Continue</span>
-                          <span class="btn-deploy-sub">Level ${saved.wave} · ${saved.score.toLocaleString()} pts</span>
-                        </button>`
-                      : ""
-                  }
-                  ${
-                    meta.endlessUnlocked
-                      ? `<button type="button" class="btn btn-endless" data-action="endless">
-                          <span class="btn-deploy-label">Endless</span>
-                          <span class="btn-deploy-sub">${endlessSub}</span>
-                        </button>`
-                      : ""
-                  }
-                </div>`
-              : ""
-          }
-        </section>
-
-        <section class="panel cabinet-panel menu-difficulty">
-          <h2 class="panel-label">Difficulty</h2>
-          <div class="difficulty-segments" role="radiogroup" aria-label="Difficulty">
-            ${(["casual", "classic", "insane"] as Difficulty[])
-              .map(
-                (d) => `
-              <label class="difficulty-segment ${d === diff ? "selected" : ""}" data-diff="${d}">
-                <input type="radio" name="diff" value="${d}" ${d === diff ? "checked" : ""} />
-                <span class="difficulty-segment-label">${DIFF_LABELS[d]}</span>
-              </label>`
-              )
-              .join("")}
-          </div>
-        </section>
-
-        <nav class="menu-nav-grid" aria-label="Arcade menu">
-          <button type="button" class="nav-tile nav-tile-daily ${dailyDone ? "nav-tile-daily--done" : ""}" data-action="daily">
-            <span class="nav-tile-icon">☀</span>
-            <span class="nav-tile-label">Daily</span>
-            <span class="nav-tile-meta">${dailyDone ? "Done" : "Daily Ops"}</span>
-          </button>
-          <button type="button" class="nav-tile" data-action="armory">
-            <span class="nav-tile-icon">⚔</span>
-            <span class="nav-tile-label">Armory</span>
-            <span class="nav-tile-meta">Fighter · ${shipProfile.name}</span>
-          </button>
-          <button type="button" class="nav-tile" data-action="challenges">
-            <span class="nav-tile-icon">◎</span>
-            <span class="nav-tile-label">Challenges</span>
-            <span class="nav-tile-meta">${badgeCount}/${challengeTotal}</span>
-          </button>
-          <button type="button" class="nav-tile nav-tile-modes" data-action="modes">
-            <span class="nav-tile-icon">▦</span>
-            <span class="nav-tile-label">Modes</span>
-            <span class="nav-tile-meta">Soon</span>
-          </button>
-          <button type="button" class="nav-tile" data-action="highscores">
-            <span class="nav-tile-icon">★</span>
-            <span class="nav-tile-label">High Scores</span>
-          </button>
-          <button type="button" class="nav-tile" data-action="settings">
-            <span class="nav-tile-icon">⚙</span>
-            <span class="nav-tile-label">Settings</span>
-          </button>
-          <button type="button" class="nav-tile nav-tile-wide" data-action="howto">
-            <span class="nav-tile-icon">▤</span>
-            <span class="nav-tile-label">How to Play</span>
-          </button>
-        </nav>
-
-        <footer class="menu-footer">
-          <a class="link-neon" href="https://neon-ikan-tech1.vercel.app" target="_blank" rel="noopener">
-            Play NEON Siege 2050 →
-          </a>
-          <span class="menu-version">v1.0 · OG Edition</span>
-        </footer>
+        </div>
       </div>
     `;
 
@@ -293,8 +364,10 @@ export class MenuScreen implements Screen {
     root.querySelector('[data-action="daily"]')?.addEventListener("click", () => {
       this.deps.onNavigate("dailyOps");
     });
-    root.querySelector('[data-action="armory"]')?.addEventListener("click", () => {
-      this.deps.onNavigate("armory");
+    root.querySelectorAll('[data-action="armory"]').forEach((el) => {
+      el.addEventListener("click", () => {
+        this.deps.onNavigate("armory");
+      });
     });
     root.querySelector('[data-action="challenges"]')?.addEventListener("click", () => {
       this.deps.onNavigate("challenges");
@@ -316,7 +389,7 @@ export class MenuScreen implements Screen {
       el.addEventListener("click", () => {
         const d = (el as HTMLElement).dataset.diff as Difficulty;
         this.deps.onDifficultyChange(d);
-        root.querySelectorAll(".difficulty-segment").forEach((o) => o.classList.remove("selected"));
+        root.querySelectorAll(".dip-switch, .difficulty-toggle").forEach((o) => o.classList.remove("selected"));
         el.classList.add("selected");
         (el.querySelector("input") as HTMLInputElement).checked = true;
       });
