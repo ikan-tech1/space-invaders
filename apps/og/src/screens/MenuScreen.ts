@@ -8,7 +8,7 @@ import { EasterEggRegistry } from "../progression/easterEggs";
 import { loadOgMeta, saveOgMeta, unlockCosmeticColor } from "../progression/metaStore";
 import { queuePendingToast } from "../progression/pendingToasts";
 import { getCosmeticsForHull, resolveShipPaint } from "../progression/shipCosmetics";
-import { mountHangarHeroPreview } from "../ui/armoryGunPreview";
+import { mountMenuHeroPreview } from "../ui/armoryGunPreview";
 import { getEndlessTier } from "../progression/endlessProgression";
 import { drainPendingToasts } from "../progression/pendingToasts";
 import { SHIP_PROFILES } from "../progression/ships";
@@ -33,6 +33,7 @@ const DIFF_LABELS: Record<Difficulty, string> = {
 export class MenuScreen implements Screen {
   id = "menu" as const;
   private eggs = new EasterEggRegistry();
+  private heroPreviewCleanup: (() => void) | null = null;
 
   constructor(private deps: MenuScreenDeps) {}
 
@@ -48,6 +49,12 @@ export class MenuScreen implements Screen {
       meta.endlessBestDepth > 0
         ? `${endlessTier.name} · best L${meta.endlessBestDepth}`
         : "Survival run · rank up by depth";
+    const shipProfile = SHIP_PROFILES[meta.equippedShip];
+    const shipCosmetics = getCosmeticsForHull(meta.shipCosmetics, meta.equippedShip);
+    const shipCallsign = shipCosmetics.callsign;
+    const shipCaption = shipCallsign
+      ? `${shipProfile.name} · ${shipCallsign}`
+      : shipProfile.name;
 
     root.innerHTML = `
       <div class="screen menu-screen">
@@ -102,18 +109,35 @@ export class MenuScreen implements Screen {
               <span class="arcade-title-line arcade-title-line--glow">INVADERS</span>
             </h1>
             <p class="arcade-tagline">Classic Arcade Edition</p>
-            <canvas class="menu-hero-ship" data-ship-hero width="120" height="72" aria-hidden="true"></canvas>
-            <div class="menu-cabinet-meta">
+            <div class="arcade-marquee menu-arcade-marquee" aria-hidden="true">
+              <span>1 CREDIT · <em class="menu-marquee-insert">INSERT COIN</em></span>
+            </div>
+            <div class="menu-hero-stage">
+              <button type="button" class="menu-hero-ship-btn" data-action="armory" aria-label="Open Armory to change ${shipProfile.name}">
+                <canvas class="menu-hero-ship" data-ship-hero width="140" height="84" aria-hidden="true"></canvas>
+                <span class="menu-hero-scanline" aria-hidden="true"></span>
+              </button>
+              <div class="menu-ship-caption">
+                <span class="menu-ship-name">${shipCaption}</span>
+                <span class="menu-ship-change">Change in Armory →</span>
+              </div>
+              <button type="button" class="btn btn-menu-hangar" data-action="armory">
+                CHANGE SHIP
+              </button>
+            </div>
+            <div class="menu-cabinet-meta" aria-label="Arcade status">
               <div class="menu-stat-ring menu-stat-ring--intro" aria-label="Challenge progress ${badgeCount} of ${challengeTotal}">
                 <svg viewBox="0 0 64 64" class="menu-stat-ring-svg" aria-hidden="true">
-                  <circle class="menu-stat-ring-track" cx="32" cy="32" r="28" fill="none" stroke-width="4"/>
-                  <circle class="menu-stat-ring-fill" cx="32" cy="32" r="28" fill="none" stroke-width="4"
-                    stroke-dasharray="${(2 * Math.PI * 28).toFixed(1)}"
-                    stroke-dashoffset="${(2 * Math.PI * 28 * (1 - badgeCount / Math.max(challengeTotal, 1))).toFixed(1)}"
-                    style="--ring-offset: ${(2 * Math.PI * 28 * (1 - badgeCount / Math.max(challengeTotal, 1))).toFixed(1)}"/>
+                  <circle class="menu-stat-ring-track" cx="32" cy="32" r="26" fill="none" stroke-width="4"/>
+                  <circle class="menu-stat-ring-fill" cx="32" cy="32" r="26" fill="none" stroke-width="4"
+                    stroke-dasharray="${(2 * Math.PI * 26).toFixed(1)}"
+                    stroke-dashoffset="${(2 * Math.PI * 26 * (1 - badgeCount / Math.max(challengeTotal, 1))).toFixed(1)}"
+                    style="--ring-offset: ${(2 * Math.PI * 26 * (1 - badgeCount / Math.max(challengeTotal, 1))).toFixed(1)}"/>
                 </svg>
-                <span class="menu-stat-ring-value">${Math.round((badgeCount / Math.max(challengeTotal, 1)) * 100)}%</span>
-                <span class="menu-stat-ring-label">Badges</span>
+                <div class="menu-stat-ring-center">
+                  <span class="menu-stat-ring-value">${Math.round((badgeCount / Math.max(challengeTotal, 1)) * 100)}%</span>
+                  <span class="menu-stat-ring-label">Badges</span>
+                </div>
               </div>
               <div class="menu-credit-counter" aria-label="Arcade credits">
                 <span class="menu-credit-slot" aria-hidden="true"></span>
@@ -132,13 +156,9 @@ export class MenuScreen implements Screen {
                 <span class="menu-stat-chip-label">Stars</span>
                 <span class="menu-stat-chip-value menu-stat-chip-value--gold">★ ${meta.stars}</span>
               </span>
-              <span class="menu-stat-chip">
+              <span class="menu-stat-chip menu-stat-chip--ship">
                 <span class="menu-stat-chip-label">Ship</span>
-                <span class="menu-stat-chip-value">${(() => {
-                  const cs = getCosmeticsForHull(meta.shipCosmetics, meta.equippedShip).callsign;
-                  const name = SHIP_PROFILES[meta.equippedShip].name;
-                  return cs ? `${name} · ${cs}` : name;
-                })()}</span>
+                <span class="menu-stat-chip-value">${shipCaption}</span>
               </span>
               <span class="menu-stat-chip">
                 <span class="menu-stat-chip-label">Badges</span>
@@ -157,7 +177,13 @@ export class MenuScreen implements Screen {
           <div class="menu-cabinet-base" aria-hidden="true">
             <div class="menu-coin-slot">
               <span class="menu-coin-slot-dot"></span>
-              <span>INSERT COIN TO PLAY</span>
+              <span class="menu-coin-slot-text">
+                <span class="menu-coin-slot-credit">1 CREDIT</span>
+                <span class="menu-coin-slot-sep" aria-hidden="true"> · </span>
+                <span class="menu-coin-slot-insert">INSERT COIN</span>
+                <span class="menu-coin-slot-sep" aria-hidden="true"> · </span>
+                <span class="menu-coin-slot-play">TO PLAY</span>
+              </span>
             </div>
             <div class="menu-cabinet-legs">
               <span class="menu-cabinet-leg"></span>
@@ -219,7 +245,7 @@ export class MenuScreen implements Screen {
           <button type="button" class="nav-tile" data-action="armory">
             <span class="nav-tile-icon">⚔</span>
             <span class="nav-tile-label">Armory</span>
-            <span class="nav-tile-meta">${SHIP_PROFILES[meta.equippedShip].name}</span>
+            <span class="nav-tile-meta">Fighter · ${shipProfile.name}</span>
           </button>
           <button type="button" class="nav-tile" data-action="challenges">
             <span class="nav-tile-icon">◎</span>
@@ -321,13 +347,12 @@ export class MenuScreen implements Screen {
       });
     }
 
-    const shipProfile = SHIP_PROFILES[meta.equippedShip];
     const menuPaint = resolveShipPaint(
-      getCosmeticsForHull(meta.shipCosmetics, meta.equippedShip),
+      shipCosmetics,
       shipProfile.color,
       shipProfile.accent
     );
-    mountHangarHeroPreview(root, shipProfile.spriteKey, menuPaint.primary);
+    this.heroPreviewCleanup = mountMenuHeroPreview(root, shipProfile.spriteKey, menuPaint.primary);
 
     let invaderClicks = 0;
     let invaderClickTimer: ReturnType<typeof setTimeout> | null = null;
@@ -380,6 +405,8 @@ export class MenuScreen implements Screen {
   }
 
   unmount(): void {
+    this.heroPreviewCleanup?.();
+    this.heroPreviewCleanup = null;
     const el = document.getElementById("screen-root") as HTMLElement & {
       _konamiCleanup?: () => void;
     };

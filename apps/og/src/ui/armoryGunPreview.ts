@@ -184,25 +184,32 @@ export function mountArmoryGunPreviews(
   return () => cleanups.forEach((fn) => fn());
 }
 
+const menuHeroAnimators = new WeakMap<HTMLCanvasElement, number>();
+
 function drawShipOnCanvas(
   canvas: HTMLCanvasElement,
   sprite: string,
   color: string,
-  scale = 2
+  scale = 2,
+  yBob = 0,
+  engineAlpha = 1
 ): void {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
+  const w = canvas.width;
+  const h = canvas.height;
   ctx.fillStyle = "#060a14";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, w, h);
   ctx.strokeStyle = "rgba(0, 240, 255, 0.1)";
   ctx.setLineDash([4, 8]);
   ctx.beginPath();
-  ctx.moveTo(0, canvas.height * 0.72);
-  ctx.lineTo(canvas.width, canvas.height * 0.72);
+  ctx.moveTo(0, h * 0.72);
+  ctx.lineTo(w, h * 0.72);
   ctx.stroke();
   ctx.setLineDash([]);
-  const cx = canvas.width / 2;
-  const cy = canvas.height * 0.62;
+
+  const cx = w / 2;
+  const cy = h * 0.62 + yBob;
   const ox =
     sprite === "playerTitan"
       ? cx - 11 * scale
@@ -215,6 +222,15 @@ function drawShipOnCanvas(
       : sprite === "playerVanguard"
         ? cy - 9 * scale
         : cy - 8 * scale;
+
+  if (engineAlpha > 0.08) {
+    const engineY = oy + (sprite === "playerTitan" ? 18 * scale : 14 * scale);
+    ctx.fillStyle = `rgba(0, 240, 255, ${0.22 * engineAlpha})`;
+    ctx.fillRect(cx - 3 * scale, engineY, 6 * scale, 4 * scale);
+    ctx.fillStyle = `rgba(255, 45, 149, ${0.14 * engineAlpha})`;
+    ctx.fillRect(cx - 5 * scale, engineY + 2, 10 * scale, 3 * scale);
+  }
+
   drawSprite(ctx, sprite, ox, oy, color, scale);
 }
 
@@ -232,6 +248,57 @@ export function mountHangarHeroPreview(root: HTMLElement, sprite: string, color:
   const canvas = root.querySelector<HTMLCanvasElement>("canvas[data-ship-hero]");
   if (!canvas) return;
   drawShipOnCanvas(canvas, sprite, color, 3);
+}
+
+/** Menu hero — bob, engine flicker, scanline sweep (static when reduced-motion). */
+export function mountMenuHeroPreview(
+  root: HTMLElement,
+  sprite: string,
+  color: string
+): () => void {
+  const canvas = root.querySelector<HTMLCanvasElement>("canvas[data-ship-hero]");
+  if (!canvas) return () => {};
+
+  const prev = menuHeroAnimators.get(canvas);
+  if (prev) cancelAnimationFrame(prev);
+
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    drawShipOnCanvas(canvas, sprite, color, 3);
+    return () => {};
+  }
+
+  const w = canvas.width;
+  const h = canvas.height;
+  let start = performance.now();
+
+  const tick = (now: number): void => {
+    const id = requestAnimationFrame(tick);
+    menuHeroAnimators.set(canvas, id);
+    const t = (now - start) / 1000;
+    const bob = Math.sin(t * 2.4) * 2.5;
+    const engineAlpha = 0.5 + 0.5 * Math.sin(t * 11);
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    drawShipOnCanvas(canvas, sprite, color, 3, bob, engineAlpha);
+
+    const sweepY = ((t * 32) % (h + 24)) - 12;
+    const grad = ctx.createLinearGradient(0, sweepY - 6, 0, sweepY + 6);
+    grad.addColorStop(0, "rgba(0, 240, 255, 0)");
+    grad.addColorStop(0.5, "rgba(0, 240, 255, 0.14)");
+    grad.addColorStop(1, "rgba(0, 240, 255, 0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, sweepY - 6, w, 12);
+  };
+
+  tick(start);
+
+  return () => {
+    const id = menuHeroAnimators.get(canvas);
+    if (id) cancelAnimationFrame(id);
+    menuHeroAnimators.delete(canvas);
+  };
 }
 
 function statDelta(a: number, b: number): string {
