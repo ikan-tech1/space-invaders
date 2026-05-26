@@ -1,0 +1,14 @@
+{
+  "name": "space-invaders-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:og": "npm run dev -w og-space-invaders",
+    "dev:neon": "npm run dev -w neon-space-invaders",
+    "build:og": "npm run build -w og-space-invaders",
+    "build:neon": "npm run build -w neon-space-invaders",
+    "build": "npm run build:og && npm run build:neon"
+  }
+}
