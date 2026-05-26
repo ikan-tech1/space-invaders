@@ -101,9 +101,6 @@ export class MenuScreen implements Screen {
               <span class="arcade-title-line arcade-title-line--glow">INVADERS</span>
             </h1>
             <p class="arcade-tagline">Classic Arcade Edition</p>
-            <div class="arcade-marquee" aria-hidden="true">
-              <span>1 CREDIT · INSERT COIN</span>
-            </div>
             <div class="menu-cabinet-meta">
               <div class="menu-stat-ring menu-stat-ring--intro" aria-label="Challenge progress ${badgeCount} of ${challengeTotal}">
                 <svg viewBox="0 0 64 64" class="menu-stat-ring-svg" aria-hidden="true">
@@ -121,36 +118,31 @@ export class MenuScreen implements Screen {
                 <div class="menu-credit-body">
                   <span class="menu-credit-label">Credits</span>
                   <span class="menu-credit-value">1</span>
-                  <span class="menu-credit-bank">Bank ◎ ${meta.tokens}</span>
                 </div>
               </div>
             </div>
-            <div class="arcade-stats">
-              <span class="arcade-stat">
-                <span class="arcade-stat-label">Tokens</span>
-                <span class="arcade-stat-value arcade-stat-token">◎ ${meta.tokens}</span>
+            <div class="menu-stat-chips" aria-label="Player stats">
+              <span class="menu-stat-chip">
+                <span class="menu-stat-chip-label">Tokens</span>
+                <span class="menu-stat-chip-value">◎ ${meta.tokens}</span>
               </span>
-              <span class="arcade-stat-divider" aria-hidden="true"></span>
-              <span class="arcade-stat">
-                <span class="arcade-stat-label">Stars</span>
-                <span class="arcade-stat-value arcade-stat-gold">★ ${meta.stars}</span>
+              <span class="menu-stat-chip">
+                <span class="menu-stat-chip-label">Stars</span>
+                <span class="menu-stat-chip-value menu-stat-chip-value--gold">★ ${meta.stars}</span>
               </span>
-              <span class="arcade-stat-divider" aria-hidden="true"></span>
-              <span class="arcade-stat">
-                <span class="arcade-stat-label">Ship</span>
-                <span class="arcade-stat-value arcade-stat-cyan">${SHIP_PROFILES[meta.equippedShip].name}</span>
+              <span class="menu-stat-chip">
+                <span class="menu-stat-chip-label">Ship</span>
+                <span class="menu-stat-chip-value">${SHIP_PROFILES[meta.equippedShip].name}</span>
               </span>
-              <span class="arcade-stat-divider" aria-hidden="true"></span>
-              <span class="arcade-stat">
-                <span class="arcade-stat-label">Badges</span>
-                <span class="arcade-stat-value">${badgeCount}/${challengeTotal}</span>
+              <span class="menu-stat-chip">
+                <span class="menu-stat-chip-label">Badges</span>
+                <span class="menu-stat-chip-value">${badgeCount}/${challengeTotal}</span>
               </span>
               ${
                 meta.campaignCleared
-                  ? `<span class="arcade-stat-divider" aria-hidden="true"></span>
-                     <span class="arcade-stat">
-                       <span class="arcade-stat-label">Status</span>
-                       <span class="arcade-stat-value arcade-stat-cyan">CLEARED</span>
+                  ? `<span class="menu-stat-chip menu-stat-chip--highlight">
+                       <span class="menu-stat-chip-label">Status</span>
+                       <span class="menu-stat-chip-value">Cleared</span>
                      </span>`
                   : ""
               }

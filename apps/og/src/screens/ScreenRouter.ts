@@ -1,3 +1,5 @@
+import { setUiStage } from "../render/spaceBackdrop";
+
 export type ScreenId =
   | "menu"
   | "sectorMap"
@@ -25,6 +27,7 @@ export class ScreenRouter {
     this.current?.unmount();
     this.current = screen;
     this.root.innerHTML = "";
+    setUiStage("menu");
     screen.mount(this.root);
   }
 

@@ -20,7 +20,9 @@ interface ShootingStar {
 }
 
 const STAR_COUNT = 128;
+const STAR_COUNT_MENU = 64;
 const HUES: Star["hue"][] = ["white", "white", "white", "cyan", "gold", "magenta"];
+const HUES_MENU: Star["hue"][] = ["white", "white", "white", "white", "cyan", "gold"];
 
 export class Starfield {
   private ctx: CanvasRenderingContext2D;
@@ -62,6 +64,12 @@ export class Starfield {
     } else {
       this.mode = mode;
     }
+    if (mode === "menu") {
+      this.shootingStars = [];
+      this.seedStars();
+    } else if (this.stars.length !== STAR_COUNT) {
+      this.seedStars();
+    }
     this.scheduleShootingStar();
   }
 
@@ -85,16 +93,19 @@ export class Starfield {
   }
 
   private seedStars(): void {
+    const count = this.mode === "menu" ? STAR_COUNT_MENU : STAR_COUNT;
+    const hues = this.mode === "menu" ? HUES_MENU : HUES;
+    const twinkleChance = this.mode === "menu" ? 0.04 : 0.1;
     this.stars = [];
-    for (let i = 0; i < STAR_COUNT; i++) {
+    for (let i = 0; i < count; i++) {
       const layer = (i % 3) as 0 | 1 | 2;
       this.stars.push({
         x: Math.random(),
         y: Math.random(),
         size: layer === 0 ? 0.6 + Math.random() * 0.4 : layer === 1 ? 1 + Math.random() * 0.6 : 1.4 + Math.random() * 0.8,
         layer,
-        hue: HUES[Math.floor(Math.random() * HUES.length)]!,
-        twinkle: Math.random() < 0.1,
+        hue: hues[Math.floor(Math.random() * hues.length)]!,
+        twinkle: Math.random() < twinkleChance,
         twinklePhase: Math.random() * Math.PI * 2,
       });
     }
@@ -118,12 +129,12 @@ export class Starfield {
 
   private scheduleShootingStar(): void {
     const now = performance.now();
-    if (this.mode === "static" || this.reducedMotion) {
+    if (this.mode === "static" || this.mode === "menu" || this.reducedMotion) {
       this.nextShootingAt = Infinity;
       return;
     }
-    const min = this.mode === "game" ? 18_000 : 8_000;
-    const max = this.mode === "game" ? 42_000 : 20_000;
+    const min = 18_000;
+    const max = 42_000;
     this.nextShootingAt = now + min + Math.random() * (max - min);
   }
 
@@ -149,7 +160,7 @@ export class Starfield {
     this.lastTs = ts;
 
     if (this.mode !== "static" && !this.reducedMotion) {
-      const driftMul = this.mode === "game" ? 0.35 : 1;
+      const driftMul = this.mode === "game" ? 0.35 : 0.45;
       this.driftY += dt * 8 * driftMul;
       this.driftX += dt * 2 * driftMul;
       if (this.driftY > 1) this.driftY -= 1;
@@ -174,28 +185,34 @@ export class Starfield {
 
   private drawFrame(ts: number): void {
     const { ctx, w, h } = this;
+    const isMenu = this.mode === "menu";
     ctx.clearRect(0, 0, w, h);
 
+    const nebMul = isMenu ? 0.35 : 1;
+
     const nebCyan = ctx.createRadialGradient(w * 0.2, h * 0.15, 0, w * 0.2, h * 0.15, w * 0.55);
-    nebCyan.addColorStop(0, "rgba(0, 232, 245, 0.07)");
+    nebCyan.addColorStop(0, `rgba(0, 232, 245, ${0.07 * nebMul})`);
     nebCyan.addColorStop(1, "transparent");
     ctx.fillStyle = nebCyan;
     ctx.fillRect(0, 0, w, h);
 
     const nebGold = ctx.createRadialGradient(w * 0.82, h * 0.72, 0, w * 0.82, h * 0.72, w * 0.45);
-    nebGold.addColorStop(0, "rgba(255, 210, 74, 0.05)");
+    nebGold.addColorStop(0, `rgba(255, 210, 74, ${0.05 * nebMul})`);
     nebGold.addColorStop(1, "transparent");
     ctx.fillStyle = nebGold;
     ctx.fillRect(0, 0, w, h);
 
-    const nebMag = ctx.createRadialGradient(w * 0.55, h * 0.88, 0, w * 0.55, h * 0.88, w * 0.5);
-    nebMag.addColorStop(0, "rgba(255, 45, 149, 0.04)");
-    nebMag.addColorStop(1, "transparent");
-    ctx.fillStyle = nebMag;
-    ctx.fillRect(0, 0, w, h);
+    if (!isMenu) {
+      const nebMag = ctx.createRadialGradient(w * 0.55, h * 0.88, 0, w * 0.55, h * 0.88, w * 0.5);
+      nebMag.addColorStop(0, "rgba(255, 45, 149, 0.04)");
+      nebMag.addColorStop(1, "transparent");
+      ctx.fillStyle = nebMag;
+      ctx.fillRect(0, 0, w, h);
+    }
 
     const parallax = [0.15, 0.45, 0.85];
     const time = ts * 0.001;
+    const alphaMul = isMenu ? 0.42 : 1;
 
     for (const star of this.stars) {
       let px = (star.x + this.driftX * parallax[star.layer]!) % 1;
@@ -205,7 +222,7 @@ export class Starfield {
 
       const sx = px * w;
       const sy = py * h;
-      let alpha = star.layer === 0 ? 0.35 : star.layer === 1 ? 0.55 : 0.75;
+      let alpha = (star.layer === 0 ? 0.35 : star.layer === 1 ? 0.55 : 0.75) * alphaMul;
 
       if (star.twinkle && this.mode !== "static") {
         alpha *= 0.65 + 0.35 * Math.sin(time * 2.2 + star.twinklePhase);

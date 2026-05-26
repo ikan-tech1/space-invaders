@@ -1,5 +1,5 @@
 import "./styles.css";
-import { initSpaceBackdrop, setSpaceBackdropMode } from "./render/spaceBackdrop";
+import { initSpaceBackdrop, setUiStage } from "./render/spaceBackdrop";
 import type { Difficulty, GameMode } from "./config";
 import { LocalStorageRepo } from "./storage/LocalStorageRepo";
 import { GameScreen } from "./screens/GameScreen";
@@ -56,7 +56,7 @@ function showMenu(): void {
 }
 
 function startGame(continueRun: boolean, mode: GameMode, startLevel = 1): void {
-  setSpaceBackdropMode("game");
+  setUiStage("game");
   router.clear();
   gameScreen = new GameScreen({
     repo,
@@ -66,7 +66,7 @@ function startGame(continueRun: boolean, mode: GameMode, startLevel = 1): void {
     startLevel: continueRun ? undefined : mode === "campaign" ? startLevel : 1,
     onGameOver: (score, wave) => {
       gameScreen = null;
-      setSpaceBackdropMode("menu");
+      setUiStage("menu");
       router.show(
         new GameOverScreen({
           repo,
@@ -78,7 +78,7 @@ function startGame(continueRun: boolean, mode: GameMode, startLevel = 1): void {
       );
     },
     onExitToMenu: () => {
-      setSpaceBackdropMode("menu");
+      setUiStage("menu");
       showMenu();
     },
   });
