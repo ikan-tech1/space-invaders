@@ -3,6 +3,11 @@ import type { LocalStorageRepo } from "../storage/LocalStorageRepo";
 import type { Screen } from "./ScreenRouter";
 import { OG_CHALLENGES } from "../progression/challenges";
 import {
+  getDailyChallenge,
+  getDailyDateKey,
+  loadDailyCompletedDate,
+} from "../progression/dailyChallenges";
+import {
   loadOgMeta,
   saveOgMeta,
   UPGRADE_COSTS,
@@ -40,8 +45,16 @@ export function createSettingsScreen(
           <section class="panel cabinet-panel">
             <h2 class="panel-label">Audio &amp; Controls</h2>
             <div class="settings-row">
-              <label for="vol">Volume</label>
+              <label for="vol">Master volume</label>
               <input type="range" id="vol" min="0" max="1" step="0.05" value="${s.volume}" />
+            </div>
+            <div class="settings-row">
+              <label for="sfx">SFX volume</label>
+              <input type="range" id="sfx" min="0" max="1" step="0.05" value="${s.sfxVolume}" />
+            </div>
+            <div class="settings-row">
+              <label for="ui">UI / slot volume</label>
+              <input type="range" id="ui" min="0" max="1" step="0.05" value="${s.uiVolume}" />
             </div>
             <div class="settings-row">
               <label for="touch">Touch control size</label>
@@ -58,12 +71,16 @@ export function createSettingsScreen(
       const save = (): void => {
         const settings: GameSettings = {
           volume: parseFloat((root.querySelector("#vol") as HTMLInputElement).value),
+          sfxVolume: parseFloat((root.querySelector("#sfx") as HTMLInputElement).value),
+          uiVolume: parseFloat((root.querySelector("#ui") as HTMLInputElement).value),
           touchScale: parseFloat((root.querySelector("#touch") as HTMLInputElement).value),
           muted: (root.querySelector("#mute") as HTMLInputElement).checked,
         };
         repo.saveSettings(settings);
       };
       root.querySelector("#vol")?.addEventListener("input", save);
+      root.querySelector("#sfx")?.addEventListener("input", save);
+      root.querySelector("#ui")?.addEventListener("input", save);
       root.querySelector("#touch")?.addEventListener("input", save);
       root.querySelector("#mute")?.addEventListener("change", save);
       root.querySelector("[data-back]")?.addEventListener("click", onBack);
@@ -134,6 +151,8 @@ export function createChallengesScreen(onBack: () => void): Screen {
     id: "challenges",
     mount(root) {
       const meta = loadOgMeta();
+      const daily = getDailyChallenge();
+      const dailyDone = loadDailyCompletedDate() === getDailyDateKey();
       const rows = OG_CHALLENGES.map(
         (c) => `
         <li class="challenge-item ${meta.badges.includes(c.id) ? "done" : ""}">
@@ -148,6 +167,17 @@ export function createChallengesScreen(onBack: () => void): Screen {
       root.innerHTML = `
         <div class="screen sub-screen">
           ${renderSubHeader("Challenges", `${meta.badges.length} / ${OG_CHALLENGES.length} cleared · ★ ${meta.stars} banked`, "— ACHIEVEMENTS —")}
+          <section class="panel cabinet-panel daily-challenge-panel">
+            <h2 class="panel-label">Daily challenge</h2>
+            <div class="daily-challenge-card ${dailyDone ? "daily-challenge-card--done" : ""}">
+              <div class="daily-challenge-head">
+                <strong>${daily.title}</strong>
+                ${dailyDone ? '<span class="challenge-badge">Complete</span>' : `<span class="challenge-stars">+${daily.tokenReward} ◎</span>`}
+              </div>
+              <p class="challenge-desc">${daily.description}</p>
+              <p class="daily-challenge-hint">Resets at midnight · Complete in one run</p>
+            </div>
+          </section>
           <p class="challenge-star-note">Complete challenges to earn stars for Armory upgrades.</p>
           <section class="panel cabinet-panel panel-flush">
             <ul class="challenge-list">${rows}</ul>

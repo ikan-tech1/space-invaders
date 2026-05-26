@@ -6,6 +6,8 @@ import { InputManager } from "../input/InputManager";
 import { CanvasRenderer } from "../render/CanvasRenderer";
 import type { LocalStorageRepo, SavedRun } from "../storage/LocalStorageRepo";
 import { showLevelCompleteModal } from "../ui/levelCompleteModal";
+import { showSectorBriefingModal } from "../ui/sectorBriefingModal";
+import { getSectorBriefing } from "../progression/sectorBriefings";
 import { showSlotMachine } from "../ui/slotMachine";
 
 export interface GameScreenDeps {
@@ -27,12 +29,14 @@ export class GameScreen {
   private saveInterval: ReturnType<typeof setInterval> | null = null;
   private levelModal: HTMLElement;
   private slotOverlay: HTMLElement;
+  private briefingModal: HTMLElement;
 
   constructor(private deps: GameScreenDeps) {
     this.canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
     this.gameLayer = document.getElementById("game-layer") as HTMLElement;
     this.levelModal = document.getElementById("level-complete-modal") as HTMLElement;
     this.slotOverlay = document.getElementById("slot-machine-overlay") as HTMLElement;
+    this.briefingModal = document.getElementById("sector-briefing-modal") as HTMLElement;
   }
 
   start(): void {
@@ -45,8 +49,11 @@ export class GameScreen {
     this.levelModal.innerHTML = "";
     this.slotOverlay.classList.add("hidden");
     this.slotOverlay.innerHTML = "";
+    this.briefingModal.classList.add("hidden");
+    this.briefingModal.innerHTML = "";
 
     document.getElementById("pause-overlay")!.classList.add("hidden");
+    document.getElementById("hud-boss-weak")!.classList.add("hidden");
 
     const ctx = this.canvas.getContext("2d")!;
     const renderer = new CanvasRenderer(ctx);
@@ -54,6 +61,8 @@ export class GameScreen {
 
     this.audio = new AudioManager();
     this.audio.volume = settings.volume;
+    this.audio.sfxVolume = settings.sfxVolume;
+    this.audio.uiVolume = settings.uiVolume;
     this.audio.muted = settings.muted;
 
     this.input = new InputManager();
@@ -71,6 +80,7 @@ export class GameScreen {
     const hudRunPool = document.getElementById("hud-run-pool")!;
     const hudEndlessMult = document.getElementById("hud-endless-mult")!;
     const hudCombo = document.getElementById("hud-combo")!;
+    const hudBossWeak = document.getElementById("hud-boss-weak")!;
     const waveBanner = document.getElementById("wave-banner")!;
     const pauseOverlay = document.getElementById("pause-overlay")!;
 
@@ -114,10 +124,18 @@ export class GameScreen {
         const liveReport = { ...report };
         showLevelCompleteModal(this.levelModal, liveReport, {
           purchasedIds: this.game?.interstitialPurchases ?? [],
+          endlessPurchasedIds: this.game?.interstitialEndlessPurchases ?? [],
           onPurchase: (id) => {
             const ok = this.game?.spendInterstitialTokens(id) ?? false;
             if (ok && this.game) {
               liveReport.walletTokens = this.game.meta.tokens;
+              liveReport.runTokenPool = this.game.runTokenPool;
+            }
+            return ok;
+          },
+          onEndlessPurchase: (id) => {
+            const ok = this.game?.spendInterstitialEndlessTokens(id) ?? false;
+            if (ok && this.game) {
               liveReport.runTokenPool = this.game.runTokenPool;
             }
             return ok;
@@ -153,6 +171,16 @@ export class GameScreen {
       onLoadoutChange: (ship, gun) => {
         hudShip.textContent = ship;
         hudGun.textContent = gun;
+      },
+      onSectorBriefing: (level) => {
+        this.briefingModal.classList.remove("hidden");
+        showSectorBriefingModal(this.briefingModal, getSectorBriefing(level), () => {
+          this.game?.dismissSectorBriefing();
+        });
+      },
+      onBossWeakPoint: (visible, label) => {
+        hudBossWeak.classList.toggle("hidden", !visible);
+        if (visible) hudBossWeak.textContent = `◎ ${label}`;
       },
       onSlotMachine: (ctx) => {
         if (!this.game || !this.audio) return;
@@ -204,7 +232,7 @@ export class GameScreen {
     this.loop.start();
 
     this.saveInterval = setInterval(() => {
-      if (this.game && this.game.state !== "gameOver" && this.game.state !== "slotMachine") {
+      if (this.game && this.game.state !== "gameOver" && this.game.state !== "slotMachine" && this.game.state !== "sectorBriefing") {
         const d = this.game.getSaveData();
         this.deps.repo.saveRun({
           score: d.score,
@@ -260,6 +288,7 @@ export class GameScreen {
     window.removeEventListener("resize", this.onResize);
     this.levelModal.classList.add("hidden");
     this.slotOverlay.classList.add("hidden");
+    this.briefingModal.classList.add("hidden");
     this.gameLayer.classList.add("hidden");
     document.getElementById("screen-root")!.classList.remove("hidden");
   }

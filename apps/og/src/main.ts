@@ -67,3 +67,9 @@ function startGame(continueRun: boolean, mode: GameMode): void {
 }
 
 showMenu();
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}

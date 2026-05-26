@@ -15,6 +15,8 @@ export function spawnBoss(level: number, kind: BossKind): Boss {
     kind,
     phase: 1,
     fireTimer: 0,
+    telegraphTimer: 0,
+    attackCooldown: kind === "mini" ? 1.2 : 1.8,
   };
 }
 

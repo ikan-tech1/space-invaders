@@ -8,7 +8,8 @@ import {
 } from "../config";
 import type { Boss, Bullet, PowerUpDrop, Shield, UFO } from "../game/entities/types";
 import type { Alien } from "../game/entities/types";
-import { ALIEN_COLORS, alienSpriteKey, drawSprite, pickupSpriteKey } from "./SpriteDrawer";
+import { alienColorForFormation, alienSpriteKey, drawSprite, pickupSpriteKey } from "./SpriteDrawer";
+import type { FormationType } from "../config";
 import type { ParticleSystem } from "./ParticleSystem";
 
 export class CanvasRenderer {
@@ -76,7 +77,7 @@ export class CanvasRenderer {
     }
   }
 
-  drawAliens(aliens: Alien[], animTick: number): void {
+  drawAliens(aliens: Alien[], animTick: number, formation: FormationType = "classic"): void {
     const frame = Math.floor(animTick * 4) % 2;
     for (const a of aliens) {
       if (!a.alive) continue;
@@ -85,7 +86,7 @@ export class CanvasRenderer {
         alienSpriteKey(a.type, frame),
         a.x,
         a.y,
-        ALIEN_COLORS[a.type] ?? COLORS.alien1,
+        alienColorForFormation(a.type, formation),
         2
       );
     }
@@ -163,32 +164,35 @@ export class CanvasRenderer {
     const x = boss.x;
     const y = boss.y;
     const mini = boss.kind === "mini";
-    const scale = mini ? 0.65 : 1;
-    ctx.fillStyle = mini ? COLORS.magenta : COLORS.boss;
-    ctx.beginPath();
-    ctx.moveTo(x, y - 28 * scale);
-    ctx.lineTo(x + 55 * scale, y + 20 * scale);
-    ctx.lineTo(x + 20 * scale, y + 10 * scale);
-    ctx.lineTo(x, y + 28 * scale);
-    ctx.lineTo(x - 20 * scale, y + 10 * scale);
-    ctx.lineTo(x - 55 * scale, y + 20 * scale);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = COLORS.magenta;
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    const sprite = mini ? "bossMini" : "bossBig";
+    const color = mini ? COLORS.magenta : COLORS.boss;
+    const ox = mini ? 24 : 36;
+    const oy = mini ? 20 : 28;
+    drawSprite(ctx, sprite, x - ox, y - oy, color, mini ? 2 : 3);
+
+    if (boss.telegraphTimer > 0) {
+      const pulse = 0.35 + Math.sin(Date.now() / 80) * 0.25;
+      ctx.strokeStyle = `rgba(255, 68, 102, ${pulse})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x, y + 10, mini ? 38 : 52, 0, Math.PI * 2);
+      ctx.stroke();
+    }
 
     const hpPct = boss.hp / boss.maxHp;
     ctx.fillStyle = "rgba(0,0,0,0.5)";
-    ctx.fillRect(x - 50, y - 42, 100, 8);
+    ctx.fillRect(x - 50, y - (mini ? 36 : 48), 100, 8);
     ctx.fillStyle = COLORS.gold;
-    ctx.fillRect(x - 50, y - 42, 100 * hpPct, 8);
+    ctx.fillRect(x - 50, y - (mini ? 36 : 48), 100 * hpPct, 8);
 
     ctx.fillStyle = COLORS.accent;
+    ctx.shadowColor = COLORS.accent;
+    ctx.shadowBlur = 10;
     const wpX = x + (boss.weakPoint === 0 ? -25 : boss.weakPoint === 1 ? 0 : 25);
     ctx.beginPath();
-    ctx.arc(wpX, y, 8, 0, Math.PI * 2);
+    ctx.arc(wpX, y + 8, mini ? 6 : 8, 0, Math.PI * 2);
     ctx.fill();
+    ctx.shadowBlur = 0;
   }
 
   drawPowerUp(p: PowerUpDrop): void {

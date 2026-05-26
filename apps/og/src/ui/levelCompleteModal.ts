@@ -1,10 +1,13 @@
 import type { LevelCompleteReport } from "../progression/levelComplete";
 import { RUN_CONSUMABLES, type RunConsumableId } from "../progression/runShop";
+import { ENDLESS_CONSUMABLES, type EndlessConsumableId } from "../progression/endlessShop";
 
 export interface LevelCompleteModalOptions {
   onContinue: () => void;
   onPurchase?: (id: RunConsumableId) => boolean;
+  onEndlessPurchase?: (id: EndlessConsumableId) => boolean;
   purchasedIds?: RunConsumableId[];
+  endlessPurchasedIds?: EndlessConsumableId[];
 }
 
 export function showLevelCompleteModal(
@@ -15,6 +18,7 @@ export function showLevelCompleteModal(
   const opts: LevelCompleteModalOptions =
     typeof options === "function" ? { onContinue: options } : options;
   const purchased = new Set(opts.purchasedIds ?? []);
+  const endlessPurchased = new Set(opts.endlessPurchasedIds ?? []);
 
   const render = (): void => {
     const challengeRows = report.levelChallenges
@@ -46,6 +50,23 @@ export function showLevelCompleteModal(
           <span class="supply-item-cost">${soldOut ? "Purchased" : `${item.cost} ◎ run`}</span>
         </button>`;
     }).join("");
+
+    const endlessRows =
+      report.gameMode === "endless"
+        ? ENDLESS_CONSUMABLES.map((item) => {
+            const count = [...endlessPurchased].filter((id) => id === item.id).length;
+            const max = item.maxPerInterstitial ?? 99;
+            const soldOut = count >= max;
+            const canAfford = report.runTokenPool >= item.cost;
+            return `
+        <button type="button" class="supply-item supply-item--endless ${soldOut ? "supply-item--sold" : ""}"
+          data-endless="${item.id}" ${soldOut || !canAfford ? "disabled" : ""}>
+          <span class="supply-item-name">${item.name}</span>
+          <span class="supply-item-desc">${item.description}</span>
+          <span class="supply-item-cost">${soldOut ? "Purchased" : `${item.cost} ◎ run`}</span>
+        </button>`;
+          }).join("")
+        : "";
 
     root.innerHTML = `
     <div class="level-complete-panel arcade-cabinet arcade-cabinet--modal">
@@ -103,7 +124,14 @@ export function showLevelCompleteModal(
             ? ""
             : `
         <h3 class="lc-supply-title">Supply depot <span class="lc-supply-hint">Spend run pool mid-campaign</span></h3>
-        <div class="supply-depot">${supplyRows}</div>`
+        <div class="supply-depot">${supplyRows}</div>
+        ${
+          report.gameMode === "endless"
+            ? `
+        <h3 class="lc-supply-title lc-supply-title--endless">Endless shop <span class="lc-supply-hint">Run modifiers · endless only</span></h3>
+        <div class="supply-depot supply-depot--endless">${endlessRows}</div>`
+            : ""
+        }`
         }
         <div class="screen-marquee lc-marquee" aria-hidden="true">
           <span>${report.campaignCleared ? "ENDLESS UNLOCKED" : `NEXT: LEVEL ${report.nextLevel}`}</span>
@@ -125,6 +153,15 @@ export function showLevelCompleteModal(
         const id = btn.dataset.supply as RunConsumableId;
         if (!opts.onPurchase?.(id)) return;
         purchased.add(id);
+        render();
+      });
+    });
+
+    root.querySelectorAll<HTMLButtonElement>("[data-endless]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.endless as EndlessConsumableId;
+        if (!opts.onEndlessPurchase?.(id)) return;
+        endlessPurchased.add(id);
         render();
       });
     });

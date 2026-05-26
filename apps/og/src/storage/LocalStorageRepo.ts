@@ -9,6 +9,8 @@ export interface HighScoreEntry {
 
 export interface GameSettings {
   volume: number;
+  sfxVolume: number;
+  uiVolume: number;
   touchScale: number;
   muted: boolean;
 }
@@ -28,6 +30,8 @@ const KEYS = {
 
 const DEFAULT_SETTINGS: GameSettings = {
   volume: 0.6,
+  sfxVolume: 1,
+  uiVolume: 1,
   touchScale: 1,
   muted: false,
 };

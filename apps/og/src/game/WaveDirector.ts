@@ -29,6 +29,8 @@ export class WaveDirector {
       kind: "big",
       phase: 1,
       fireTimer: 0,
+      telegraphTimer: 0,
+      attackCooldown: 1.8,
     };
   }
 

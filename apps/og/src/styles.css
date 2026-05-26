@@ -2682,18 +2682,14 @@ body {
   .arcade-title,
   .arcade-marquee span,
   .screen-marquee span,
-  .slot-machine-panel--win {
+  .slot-machine-panel--win,
+  .hud-endless,
+  .hud-boss-weak {
     animation: none;
   }
 
-  .game-over-screen--record .final-score {
-    animation: none;
-  }
-
-  .hud-combo {
-    animation: none;
-  }
-
+  .game-over-screen--record .final-score,
+  .hud-combo,
   .wave-banner,
   #wave-banner {
     animation: none;
@@ -2710,5 +2706,148 @@ body {
   #touch-fire:active,
   #touch-pause:active {
     transform: none;
+  }
+}
+
+/* ── Iter 4: sector briefing, boss HUD, daily, mobile HUD ── */
+
+.sector-briefing-panel {
+  width: min(100%, 380px);
+  text-align: center;
+}
+
+.sector-briefing-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  margin: 8px 0 4px;
+  color: var(--accent);
+}
+
+.sector-briefing-level {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin: 0 0 12px;
+}
+
+.sector-briefing-body-text {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  margin: 0 0 12px;
+}
+
+.sector-briefing-tip {
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 210, 74, 0.3);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 210, 74, 0.06);
+  margin-bottom: 12px;
+}
+
+.sector-briefing-tip-label {
+  display: block;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+
+.sector-briefing-tip p {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.hud-boss-weak {
+  margin-top: 4px;
+  text-align: center;
+  font-family: var(--font-pixel);
+  font-size: clamp(0.3rem, 1.6vw, 0.36rem);
+  letter-spacing: 0.12em;
+  color: #ff4466;
+  padding: 3px 10px;
+  border: 1px solid rgba(255, 68, 102, 0.45);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 68, 102, 0.08);
+  animation: boss-weak-pulse 1s ease-in-out infinite;
+}
+
+@keyframes boss-weak-pulse {
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.daily-challenge-panel {
+  margin-bottom: 8px;
+}
+
+.daily-challenge-card {
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 240, 255, 0.04);
+}
+
+.daily-challenge-card--done {
+  border-color: rgba(255, 210, 74, 0.35);
+  background: rgba(255, 210, 74, 0.05);
+}
+
+.daily-challenge-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.daily-challenge-hint {
+  margin: 6px 0 0;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+.lc-supply-title--endless {
+  color: var(--gold);
+}
+
+.supply-item--endless {
+  background: rgba(255, 210, 74, 0.05);
+  border-color: rgba(255, 210, 74, 0.25);
+}
+
+@media (max-width: 520px) {
+  .hud-loadout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    width: 100%;
+    max-width: 360px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .hud-gun {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .hud-meta {
+    min-width: 0;
+    padding: 3px 6px;
+  }
+
+  .hud-cabinet .hud-row {
+    gap: 4px;
+  }
+
+  .hud-stat {
+    min-width: 0;
+  }
+
+  #game-layer {
+    padding-bottom: calc(8px + var(--safe-bottom));
   }
 }

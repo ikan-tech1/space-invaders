@@ -23,4 +23,5 @@ export interface LevelCompleteReport {
   runTokenPool: number;
   /** Endless mode payout multiplier applied this level (1 = none). */
   endlessTokenMult: number;
+  gameMode: "campaign" | "endless";
 }

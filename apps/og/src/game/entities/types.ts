@@ -59,6 +59,9 @@ export interface Boss {
   kind: BossKind;
   phase: number;
   fireTimer: number;
+  /** Countdown before boss volley — telegraph flash in renderer. */
+  telegraphTimer: number;
+  attackCooldown: number;
 }
 
 export interface Shield {

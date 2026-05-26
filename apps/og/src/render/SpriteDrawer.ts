@@ -164,6 +164,24 @@ const SPRITES: Record<string, number[][]> = {
     [0, 0, 0, 1, 1, 1, 0, 0, 0],
     [0, 0, 1, 0, 0, 0, 1, 0, 0],
   ],
+  bossMini: [
+    [0, 0, 1, 1, 1, 0, 0],
+    [0, 1, 1, 1, 1, 1, 0],
+    [1, 1, 0, 1, 0, 1, 1],
+    [1, 1, 1, 1, 1, 1, 1],
+    [0, 1, 1, 0, 1, 1, 0],
+    [0, 0, 1, 0, 1, 0, 0],
+  ],
+  bossBig: [
+    [0, 0, 0, 1, 1, 1, 0, 0, 0],
+    [0, 0, 1, 1, 1, 1, 1, 0, 0],
+    [0, 1, 1, 0, 1, 0, 1, 1, 0],
+    [1, 1, 1, 1, 1, 1, 1, 1, 1],
+    [1, 0, 1, 1, 1, 1, 1, 0, 1],
+    [1, 1, 1, 0, 1, 0, 1, 1, 1],
+    [0, 1, 1, 1, 0, 1, 1, 1, 0],
+    [0, 0, 1, 0, 0, 0, 1, 0, 0],
+  ],
   ufo: [
     [0, 0, 1, 1, 1, 1, 1, 0, 0],
     [0, 1, 1, 1, 1, 1, 1, 1, 0],
@@ -200,6 +218,20 @@ export function alienSpriteKey(type: number, frame: number): string {
 }
 
 export const ALIEN_COLORS = ["#00f0ff", "#ff2d95", "#7bff6e"];
+
+export const FORMATION_TINTS: Record<string, string> = {
+  classic: "#00f0ff",
+  staggered: "#66ccff",
+  diamond: "#ffd24a",
+  pincer: "#ff2d95",
+};
+
+export function alienColorForFormation(type: number, formation: string): string {
+  const base = ALIEN_COLORS[type] ?? "#00f0ff";
+  const tint = FORMATION_TINTS[formation];
+  if (!tint || formation === "classic") return base;
+  return tint;
+}
 
 const PICKUP_SPRITES: Record<string, string> = {
   rapid: "pickupRapid",

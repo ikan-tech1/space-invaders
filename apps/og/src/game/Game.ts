@@ -53,6 +53,18 @@ import {
   GUN_VOLLEY_LABELS,
 } from "./weaponVolley";
 import { getRunConsumable, type RunConsumableId } from "../progression/runShop";
+import {
+  getEndlessConsumable,
+  type EndlessConsumableId,
+} from "../progression/endlessShop";
+import {
+  getDailyChallenge,
+  getDailyDateKey,
+  loadDailyCompletedDate,
+  saveDailyCompleted,
+  type DailyRunStats,
+} from "../progression/dailyChallenges";
+import type { FormationType } from "../config";
 import { getShipProfile } from "../progression/ships";
 import type { SlotMachineContext, SlotOutcome } from "../ui/slotMachine";
 
@@ -60,6 +72,7 @@ export type GameState =
   | "playing"
   | "paused"
   | "waveBanner"
+  | "sectorBriefing"
   | "levelInterstitial"
   | "slotMachine"
   | "gameOver";
@@ -80,6 +93,8 @@ export interface GameCallbacks {
   onRunPoolChange: (pool: number) => void;
   onEndlessMultChange: (mult: number) => void;
   onLoadoutChange: (ship: string, gun: string) => void;
+  onSectorBriefing: (level: number) => void;
+  onBossWeakPoint: (visible: boolean, label: string) => void;
 }
 
 const BASE_POWERUPS: PowerUpType[] = ["rapid", "spread", "shield", "slow"];
@@ -151,6 +166,20 @@ export class Game {
   magnetBurstActive = false;
   bossPhase2Reached = false;
   rerolledChallengeIds = new Set<string>();
+  currentFormation: FormationType = "classic";
+  runKills = 0;
+  runMaxCombo = 1;
+  runBossDefeated = false;
+  runFlawlessLevel = false;
+  runLevelsCleared = 0;
+  pendingEndlessMultBoost = 0;
+  pendingIronShield = false;
+  pendingScoreSurge = false;
+  pendingAlienSlow = false;
+  alienSlowActive = false;
+  scoreSurgeActive = false;
+  endlessMultBoostActive = 0;
+  interstitialEndlessPurchases: EndlessConsumableId[] = [];
 
   constructor(
     public renderer: CanvasRenderer,
@@ -207,6 +236,11 @@ export class Game {
     }
     this.runTokensEarned = 0;
     this.runTokenPool = 0;
+    this.runKills = 0;
+    this.runMaxCombo = 1;
+    this.runBossDefeated = false;
+    this.runFlawlessLevel = false;
+    this.runLevelsCleared = 0;
     this.startLevel();
     this.callbacks.onLivesChange(this.lives);
     this.callbacks.onScoreChange(this.score);
@@ -238,7 +272,40 @@ export class Game {
 
   private getEndlessTokenMult(): number {
     if (this.gameMode !== "endless") return 1;
-    return 1 + Math.min(1.5, (this.levelDirector.level - 1) * 0.08);
+    const base = 1 + Math.min(1.5, (this.levelDirector.level - 1) * 0.08);
+    return base + this.endlessMultBoostActive;
+  }
+
+  spendInterstitialEndlessTokens(id: EndlessConsumableId): boolean {
+    if (this.state !== "levelInterstitial" || this.gameMode !== "endless") return false;
+    const item = getEndlessConsumable(id);
+    const count = this.interstitialEndlessPurchases.filter((p) => p === id).length;
+    const max = item.maxPerInterstitial ?? 99;
+    if (count >= max || this.runTokenPool < item.cost) return false;
+
+    this.runTokenPool -= item.cost;
+    this.interstitialEndlessPurchases.push(id);
+    this.callbacks.onRunPoolChange(this.runTokenPool);
+
+    switch (id) {
+      case "mult_boost":
+        this.pendingEndlessMultBoost += 0.15;
+        this.callbacks.onToast("Mult boost armed — +0.15× next level!");
+        break;
+      case "iron_shield":
+        this.pendingIronShield = true;
+        this.callbacks.onToast("Iron shield armed!");
+        break;
+      case "score_surge":
+        this.pendingScoreSurge = true;
+        this.callbacks.onToast("Score surge — +25% kill score next level!");
+        break;
+      case "alien_slow":
+        this.pendingAlienSlow = true;
+        this.callbacks.onToast("Alien slow — march -20% next level!");
+        break;
+    }
+    return true;
   }
 
   spendInterstitialTokens(id: RunConsumableId): boolean {
@@ -315,15 +382,26 @@ export class Game {
     this.levelDamageThisLevel = false;
     this.levelTokensEarned = 0;
     this.interstitialPurchases = [];
+    this.interstitialEndlessPurchases = [];
     this.rerolledChallengeIds.clear();
     this.bossPhase2Reached = false;
     this.magnetBurstActive = this.pendingMagnetBurst;
     this.pendingMagnetBurst = false;
+    this.endlessMultBoostActive = this.pendingEndlessMultBoost;
+    this.pendingEndlessMultBoost = 0;
+    this.alienSlowActive = this.pendingAlienSlow;
+    this.pendingAlienSlow = false;
+    this.scoreSurgeActive = this.pendingScoreSurge;
+    this.pendingScoreSurge = false;
     this.bullets = [];
     this.canFire = true;
     this.fireCooldown = 0;
     this.gunVolley = "single";
     this.gunVolleyTimer = 0;
+
+    const cfg = getLevelConfig(this.levelDirector.level);
+    this.currentFormation = cfg.formation;
+
     const enc = this.levelDirector.encounter;
     if (enc === "bigBoss") {
       this.aliens = [];
@@ -337,11 +415,34 @@ export class Game {
       this.boss = null;
       this.aliens = this.levelDirector.spawnAliens(this.difficulty);
     }
-    this.showBanner(this.levelDirector.getBanner());
+    this.callbacks.onBossWeakPoint(!!this.boss?.active, this.boss ? "WEAK POINT" : "");
     this.alienDir = 1;
     this.alienTickTimer = 0;
     this.ufoTimer = 6 + Math.random() * 8;
 
+    if (this.pendingIronShield) {
+      this.pendingIronShield = false;
+      const sh = createShields(1)[0]!;
+      sh.x = CANVAS_WIDTH / 2 - 24;
+      sh.y = 400;
+      this.shields.push(sh);
+      this.callbacks.onToast("Iron shield deployed!");
+    }
+
+    if (this.gameMode === "campaign") {
+      this.state = "sectorBriefing";
+      this.callbacks.onSectorBriefing(this.levelDirector.level);
+    } else {
+      this.beginWaveBanner();
+    }
+  }
+
+  dismissSectorBriefing(): void {
+    if (this.state !== "sectorBriefing") return;
+    this.beginWaveBanner();
+  }
+
+  private beginWaveBanner(): void {
     if (this.pendingOverdrive) {
       this.pendingOverdrive = false;
       this.applyPowerUp("rapid");
@@ -356,6 +457,8 @@ export class Game {
       this.callbacks.onComboChange(this.comboCount, this.comboMult);
       this.callbacks.onToast("Combo charge — 3× active!");
     }
+    this.callbacks.onEndlessMultChange(this.getEndlessTokenMult());
+    this.showBanner(this.levelDirector.getBanner());
   }
 
   showBanner(text: string): void {
@@ -404,6 +507,11 @@ export class Game {
       return;
     }
 
+    if (this.state === "sectorBriefing") {
+      this.particles.update(dt);
+      return;
+    }
+
     if (this.state === "slotMachine") {
       this.particles.update(dt);
       return;
@@ -428,7 +536,7 @@ export class Game {
   }
 
   togglePause(): void {
-    if (this.state === "slotMachine") return;
+    if (this.state === "slotMachine" || this.state === "sectorBriefing") return;
     if (this.state === "playing") {
       this.state = "paused";
       this.callbacks.onPauseChange(true);
@@ -596,6 +704,7 @@ export class Game {
           }
           if (this.boss.hp <= 0) {
             this.grantTokens(this.boss.kind === "mini" ? 8 : 15);
+            this.runBossDefeated = true;
             this.addScore(BOSS_POINTS);
             this.particles.burst(this.boss.x, this.boss.y, "#ff2d95", 24);
             const bossKind = this.boss.kind;
@@ -611,6 +720,7 @@ export class Game {
         if (hit.alien) {
           this.levelChallenges.onShotHit();
           hit.alien.alive = false;
+          this.runKills++;
           this.handleEggReward(this.eggs.onKill());
           localStorage.setItem("og_total_kills", String(this.eggs.totalKills));
           if (this.eggs.totalKills >= 100) {
@@ -656,10 +766,11 @@ export class Game {
 
     const speedMult = this.levelDirector.speedMult(this.difficulty);
     const slow = this.slowTimer > 0 ? 0.4 : 1;
+    const alienSlow = this.alienSlowActive ? 0.8 : 1;
     const levelPace = 1 + Math.min(0.14, (this.levelDirector.level - 1) * 0.018);
     const tick = Math.max(
       MIN_ALIEN_TICK,
-      (BASE_ALIEN_TICK - (55 - alive.length) * 0.008) / speedMult / slow / levelPace
+      (BASE_ALIEN_TICK - (55 - alive.length) * 0.008) / speedMult / slow / alienSlow / levelPace
     );
 
     this.alienTickTimer += dt;
@@ -754,7 +865,10 @@ export class Game {
   }
 
   private updateBoss(dt: number): void {
-    if (!this.boss?.active) return;
+    if (!this.boss?.active) {
+      this.callbacks.onBossWeakPoint(false, "");
+      return;
+    }
     const spd = bossMoveSpeed(this.boss.kind);
     this.boss.x += this.boss.direction * spd * dt;
     const margin = this.boss.kind === "mini" ? 60 : 80;
@@ -766,17 +880,37 @@ export class Game {
       this.boss.weakPoint = Math.floor(Math.random() * 3);
       this.bossWeakTimer = 0;
     }
-    const rate = this.boss.kind === "mini" ? 0.03 : this.boss.phase === 2 ? 0.05 : 0.02;
-    if (Math.random() < rate) {
-      this.bullets.push({
-        x: this.boss.x + (Math.random() - 0.5) * 80,
-        y: this.boss.y + 30,
-        vy: ENEMY_BULLET_SPEED * (this.boss.phase === 2 ? 1.3 : 1.1),
-        fromPlayer: false,
-        active: true,
-      });
-      this.audio.play("enemyShoot");
+
+    const wpLabels = ["LEFT CORE", "CENTER CORE", "RIGHT CORE"];
+    this.callbacks.onBossWeakPoint(true, wpLabels[this.boss.weakPoint] ?? "WEAK POINT");
+
+    if (this.boss.telegraphTimer > 0) {
+      this.boss.telegraphTimer -= dt;
+      if (this.boss.telegraphTimer <= 0) {
+        const burst = this.boss.kind === "mini" ? 2 : this.boss.phase === 2 ? 5 : 3;
+        for (let i = 0; i < burst; i++) {
+          this.bullets.push({
+            x: this.boss.x + (Math.random() - 0.5) * 90,
+            y: this.boss.y + 30,
+            vy: ENEMY_BULLET_SPEED * (this.boss.phase === 2 ? 1.35 : 1.15),
+            fromPlayer: false,
+            active: true,
+          });
+        }
+        this.audio.play("enemyShoot");
+        if (this.boss.phase === 2) this.audio.play("alienAggro");
+      }
+      return;
     }
+
+    this.boss.attackCooldown -= dt;
+    const baseRate = this.boss.kind === "mini" ? 1.8 : this.boss.phase === 2 ? 1.2 : 2.4;
+    if (this.boss.attackCooldown <= 0) {
+      this.boss.telegraphTimer = this.boss.phase === 2 ? 0.55 : 0.75;
+      this.boss.attackCooldown = baseRate;
+      this.audio.play("alienAggro");
+    }
+
     if (this.boss.y > this.playerY - 60) this.hitPlayer();
   }
 
@@ -881,6 +1015,7 @@ export class Game {
     this.comboCount++;
     this.comboMult = Math.min(COMBO_MAX, 1 + Math.floor(this.comboCount / 2));
     this.challenges.onCombo(this.comboMult);
+    this.runMaxCombo = Math.max(this.runMaxCombo, this.comboMult);
     this.callbacks.onComboChange(this.comboCount, this.comboMult);
     if (this.comboMult >= 4 && this.comboMult % 2 === 0) {
       this.particles.burst(this.playerX, this.playerY - 24, "#ffd24a", 8 + this.comboMult);
@@ -889,7 +1024,8 @@ export class Game {
   }
 
   private addScore(base: number): void {
-    this.score += base * this.comboMult;
+    const surge = this.scoreSurgeActive ? 1.25 : 1;
+    this.score += Math.round(base * this.comboMult * surge);
     this.callbacks.onScoreChange(this.score);
   }
 
@@ -927,7 +1063,6 @@ export class Game {
       lives: this.lives,
       maxLives: SLOT_MAX_LIVES,
       powerUpPool: this.getAvailablePowerups(),
-      isFinalSpin: true,
       luckySlot: this.meta.upgrades.includes("luckySlot"),
     });
   }
@@ -976,6 +1111,8 @@ export class Game {
     this.particles.burst(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 3, "#ffd24a", 16);
     this.addShake(0.25);
     const flawless = !this.levelDamageThisLevel;
+    if (flawless) this.runFlawlessLevel = true;
+    this.runLevelsCleared++;
     const isBoss = enc !== "standard";
     let stars = 1;
     if (flawless) stars = 2;
@@ -1053,6 +1190,7 @@ export class Game {
       walletTokens: this.meta.tokens,
       runTokenPool: this.runTokenPool,
       endlessTokenMult,
+      gameMode: this.gameMode,
     });
     this.callbacks.onEndlessMultChange(this.getEndlessTokenMult());
     this.callbacks.onScoreChange(this.score);
@@ -1060,8 +1198,33 @@ export class Game {
 
   private endGame(campaignWin = false): void {
     this.state = "gameOver";
-    if (!campaignWin) this.audio.play("gameOver");
+    this.callbacks.onBossWeakPoint(false, "");
+    if (!campaignWin) {
+      this.audio.play("gameOver");
+      this.tryCompleteDailyChallenge();
+    }
     this.callbacks.onGameOver(this.score, this.levelDirector.level);
+  }
+
+  private tryCompleteDailyChallenge(): void {
+    const today = getDailyDateKey();
+    if (loadDailyCompletedDate() === today) return;
+    const daily = getDailyChallenge();
+    const stats: DailyRunStats = {
+      killsThisRun: this.runKills,
+      runTokensEarned: this.runTokensEarned,
+      maxCombo: this.runMaxCombo,
+      bossDefeated: this.runBossDefeated,
+      flawlessLevel: this.runFlawlessLevel,
+      levelsCleared: this.runLevelsCleared,
+    };
+    if (!daily.check(stats)) return;
+    saveDailyCompleted(today);
+    this.meta.tokens += daily.tokenReward;
+    saveOgMeta(this.meta);
+    this.callbacks.onTokensChange(this.meta.tokens);
+    this.callbacks.onToast(`Daily: ${daily.title} — +${daily.tokenReward} ◎`);
+    this.audio.play("secret");
   }
 
   draw(): void {
@@ -1069,7 +1232,7 @@ export class Game {
     renderer.drawBackground(1 / 60);
     if (this.shakeTimer > 0) renderer.applyShake(this.shakeX, this.shakeY);
     renderer.drawShields(this.shields);
-    renderer.drawAliens(this.aliens, this.animTick);
+    renderer.drawAliens(this.aliens, this.animTick, this.currentFormation);
     renderer.drawUFO(this.ufo);
     renderer.drawBoss(this.boss);
     for (const p of this.powerUps) renderer.drawPowerUp(p);

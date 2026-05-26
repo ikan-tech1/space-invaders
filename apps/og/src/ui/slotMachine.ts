@@ -16,7 +16,6 @@ export interface SlotMachineContext {
   lives: number;
   maxLives: number;
   powerUpPool: PowerUpType[];
-  isFinalSpin: boolean;
   luckySlot?: boolean;
 }
 
@@ -124,13 +123,11 @@ export function showSlotMachine(
       </div>
       <div class="slot-machine-header">
         <p class="cabinet-mini-status slot-status">
-          <span class="arcade-status-dot ${ctx.isFinalSpin ? "arcade-status-dot--danger" : ""}"></span>
-          ${ctx.isFinalSpin ? "LAST CHANCE" : "CONTINUE BONUS"}
+          <span class="arcade-status-dot arcade-status-dot--danger"></span>
+          LAST CHANCE
         </p>
         <h2 class="slot-title">Lucky Reels</h2>
-        <p class="slot-subtitle">
-          ${ctx.isFinalSpin ? "Spin for one more life or a power-up" : "Spin for a bonus on respawn"}
-        </p>
+        <p class="slot-subtitle">Spin for one more life or a power-up</p>
       </div>
       <div class="slot-machine-body">
         <div class="slot-reels" aria-live="polite">
