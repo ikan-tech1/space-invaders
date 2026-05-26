@@ -85,6 +85,16 @@ export function showLevelCompleteModal(
         <div class="lc-stars">${"★".repeat(report.stars)}${"☆".repeat(3 - report.stars)}</div>
       </div>
       <div class="level-complete-body">
+        ${
+          report.narrativeBeat
+            ? `
+        <section class="lc-narrative-beat">
+          <p class="lc-narrative-tag">${report.narrativeBeat.tag}</p>
+          <h3 class="lc-narrative-headline">${report.narrativeBeat.headline}</h3>
+          <p class="lc-narrative-body">${report.narrativeBeat.body}</p>
+        </section>`
+            : ""
+        }
         <div class="lc-scores">
           <div class="lc-score-row">
             <span>Level score</span>

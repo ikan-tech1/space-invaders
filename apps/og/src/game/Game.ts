@@ -41,6 +41,7 @@ import { CAMPAIGN_MAX_LEVEL, getLevelConfig } from "../progression/levelScript";
 import { bossMoveSpeed } from "../progression/bosses";
 import { ChallengeTracker, OG_CHALLENGES } from "../progression/challenges";
 import { EasterEggRegistry } from "../progression/easterEggs";
+import { getCampaignBeat } from "../progression/campaignNarrative";
 import type { LevelCompleteReport } from "../progression/levelComplete";
 import { LevelChallengeTracker } from "../progression/levelChallenges";
 import { loadOgMeta, saveOgMeta, type OgMeta } from "../progression/metaStore";
@@ -272,8 +273,8 @@ export class Game {
 
   private getEndlessTokenMult(): number {
     if (this.gameMode !== "endless") return 1;
-    const base = 1 + Math.min(1.5, (this.levelDirector.level - 1) * 0.08);
-    return base + this.endlessMultBoostActive;
+    const base = 1 + Math.min(1.2, (this.levelDirector.level - 1) * 0.06);
+    return Math.min(2.2, base + this.endlessMultBoostActive);
   }
 
   spendInterstitialEndlessTokens(id: EndlessConsumableId): boolean {
@@ -908,6 +909,8 @@ export class Game {
     if (this.boss.attackCooldown <= 0) {
       this.boss.telegraphTimer = this.boss.phase === 2 ? 0.55 : 0.75;
       this.boss.attackCooldown = baseRate;
+      this.particles.burst(this.boss.x, this.boss.y + 18, "#ff4466", this.boss.kind === "mini" ? 8 : 14);
+      this.addShake(this.boss.phase === 2 ? 0.12 : 0.08);
       this.audio.play("alienAggro");
     }
 
@@ -1084,9 +1087,18 @@ export class Game {
     } else if (outcome.type === "powerup") {
       this.applyPowerUp(outcome.powerUp);
       this.callbacks.onToast(POWERUP_LABELS[outcome.powerUp]);
+    } else if (outcome.type === "shield") {
+      for (const s of this.shields) patchShield(s);
+      this.callbacks.onToast("Shields restored!");
+    } else if (outcome.type === "tokens") {
+      this.runTokenPool += outcome.amount;
+      this.callbacks.onRunPoolChange(this.runTokenPool);
+      this.callbacks.onToast(`+${outcome.amount} ◎ run stash!`);
+    } else if (outcome.type === "secondWind") {
+      this.callbacks.onToast("Second wind — extended invuln!");
     }
 
-    this.invulnTimer = INVULN_TIME;
+    this.invulnTimer = outcome.type === "secondWind" ? INVULN_TIME * 2 : INVULN_TIME;
     this.respawnAfterHit();
 
     if (this.lives <= 0) {
@@ -1174,6 +1186,11 @@ export class Game {
     const tokensEarnedThisLevel = this.levelTokensEarned;
     const endlessTokenMult = this.getEndlessTokenMult();
 
+    const narrativeBeat =
+      this.gameMode === "campaign" && isBoss
+        ? getCampaignBeat(this.levelDirector.level)
+        : null;
+
     this.state = "levelInterstitial";
     this.interstitialTimer = 5;
     this.callbacks.onLevelComplete({
@@ -1191,6 +1208,7 @@ export class Game {
       runTokenPool: this.runTokenPool,
       endlessTokenMult,
       gameMode: this.gameMode,
+      narrativeBeat,
     });
     this.callbacks.onEndlessMultChange(this.getEndlessTokenMult());
     this.callbacks.onScoreChange(this.score);

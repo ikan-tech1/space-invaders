@@ -44,4 +44,13 @@ export function showSectorBriefingModal(
   };
 
   root.querySelector(".sector-briefing-go")?.addEventListener("click", dismiss, { once: true });
+
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      dismiss();
+      window.removeEventListener("keydown", onKey);
+    }
+  };
+  window.addEventListener("keydown", onKey);
 }

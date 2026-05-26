@@ -3,13 +3,20 @@ import {
   POWERUP_LABELS,
   SLOT_LIFE_CHANCE,
   SLOT_POWERUP_CHANCE,
+  SLOT_SECOND_WIND_CHANCE,
+  SLOT_SHIELD_CHANCE,
   SLOT_SYMBOLS,
+  SLOT_TOKEN_CHANCE,
+  SLOT_TOKEN_PAYOUT,
   type PowerUpType,
 } from "../config";
 
 export type SlotOutcome =
   | { type: "life" }
   | { type: "powerup"; powerUp: PowerUpType }
+  | { type: "shield" }
+  | { type: "tokens"; amount: number }
+  | { type: "secondWind" }
   | { type: "miss" };
 
 export interface SlotMachineContext {
@@ -19,10 +26,13 @@ export interface SlotMachineContext {
   luckySlot?: boolean;
 }
 
-type ReelSymbol = "life" | "miss" | PowerUpType;
+type ReelSymbol = "life" | "miss" | "shield" | "tokens" | "secondWind" | PowerUpType;
 
 const FILLER: ReelSymbol[] = [
   "miss",
+  "shield",
+  "tokens",
+  "secondWind",
   "rapid",
   "spread",
   "twin",
@@ -40,19 +50,29 @@ function rollOutcome(ctx: SlotMachineContext): SlotOutcome {
   const luck = ctx.luckySlot ? 1.35 : 1;
   const lifeChance = canWinLife ? SLOT_LIFE_CHANCE * luck : 0;
   const powerChance = canWinPower ? SLOT_POWERUP_CHANCE * luck : 0;
+  const shieldChance = SLOT_SHIELD_CHANCE;
+  const tokenChance = SLOT_TOKEN_CHANCE;
+  const secondWindChance = SLOT_SECOND_WIND_CHANCE;
   const roll = Math.random();
 
-  if (roll < lifeChance) return { type: "life" };
-  if (roll < lifeChance + powerChance) {
+  let cursor = 0;
+  if (roll < (cursor += lifeChance)) return { type: "life" };
+  if (roll < (cursor += powerChance)) {
     const powerUp = ctx.powerUpPool[Math.floor(Math.random() * ctx.powerUpPool.length)]!;
     return { type: "powerup", powerUp };
   }
+  if (roll < (cursor += shieldChance)) return { type: "shield" };
+  if (roll < (cursor += tokenChance)) return { type: "tokens", amount: SLOT_TOKEN_PAYOUT };
+  if (roll < (cursor += secondWindChance)) return { type: "secondWind" };
   return { type: "miss" };
 }
 
 function outcomeSymbol(outcome: SlotOutcome): ReelSymbol {
   if (outcome.type === "life") return "life";
   if (outcome.type === "powerup") return outcome.powerUp;
+  if (outcome.type === "shield") return "shield";
+  if (outcome.type === "tokens") return "tokens";
+  if (outcome.type === "secondWind") return "secondWind";
   return "miss";
 }
 
@@ -62,7 +82,7 @@ function buildReels(outcome: SlotOutcome, pool: PowerUpType[]): ReelSymbol[] {
     return [winSymbol, winSymbol, winSymbol];
   }
 
-  const symbols = new Set<ReelSymbol>(["miss", ...pool.slice(0, 6)]);
+  const symbols = new Set<ReelSymbol>(["miss", "shield", "tokens", "secondWind", ...pool.slice(0, 6)]);
   const choices = [...symbols];
   const reels: ReelSymbol[] = [];
   for (let i = 0; i < 3; i++) {
@@ -86,18 +106,64 @@ function reelStrip(final: ReelSymbol, filler: ReelSymbol[]): ReelSymbol[] {
   return strip;
 }
 
+function symbolLabel(sym: ReelSymbol): string {
+  if (sym === "shield") return "◆";
+  if (sym === "tokens") return "◎";
+  if (sym === "secondWind") return "☼";
+  return SLOT_SYMBOLS[sym as keyof typeof SLOT_SYMBOLS] ?? sym;
+}
+
 function outcomeMessage(outcome: SlotOutcome): string {
-  if (outcome.type === "life") return "JACKPOT — EXTRA LIFE!";
-  if (outcome.type === "powerup") {
-    return `POWER-UP — ${POWERUP_LABELS[outcome.powerUp].toUpperCase()}`;
+  switch (outcome.type) {
+    case "life":
+      return "JACKPOT — EXTRA LIFE!";
+    case "powerup":
+      return `POWER-UP — ${POWERUP_LABELS[outcome.powerUp].toUpperCase()}`;
+    case "shield":
+      return "SHIELD RESTORE — ALL BUNKERS PATCHED";
+    case "tokens":
+      return `RUN STASH — +${outcome.amount} ◎ TO SUPPLY DEPOT`;
+    case "secondWind":
+      return "SECOND WIND — EXTENDED INVULNERABILITY";
+    default:
+      return "NO MATCH — BETTER LUCK NEXT TIME";
   }
-  return "NO MATCH — BETTER LUCK NEXT TIME";
+}
+
+function outcomeDetail(outcome: SlotOutcome): string {
+  switch (outcome.type) {
+    case "life":
+      return "One life restored. Last-chance bonus only — hold the line.";
+    case "powerup":
+      return `${POWERUP_LABELS[outcome.powerUp]} armed immediately on respawn.`;
+    case "shield":
+      return "Every shield bunker on the field is repaired.";
+    case "tokens":
+      return "Tokens go to your run pool for the supply depot.";
+    case "secondWind":
+      return "Double invulnerability window after respawn.";
+    default:
+      return "No bonus this spin — the run ends unless the reels grant a life.";
+  }
 }
 
 function outcomeClass(outcome: SlotOutcome): string {
+  if (outcome.type === "miss") return "slot-result--miss";
   if (outcome.type === "life") return "slot-result--life";
-  if (outcome.type === "powerup") return "slot-result--power";
-  return "slot-result--miss";
+  if (outcome.type === "tokens") return "slot-result--tokens";
+  return "slot-result--power";
+}
+
+function oddsLegend(ctx: SlotMachineContext): string {
+  const luck = ctx.luckySlot ? " · Lucky Reels +" : "";
+  const parts = [
+    `♥ ${Math.round(SLOT_LIFE_CHANCE * (ctx.luckySlot ? 135 : 100))}%`,
+    `✦ ${Math.round(SLOT_POWERUP_CHANCE * (ctx.luckySlot ? 135 : 100))}%`,
+    `◆ ${Math.round(SLOT_SHIELD_CHANCE * 100)}%`,
+    `◎ ${Math.round(SLOT_TOKEN_CHANCE * 100)}%`,
+    `☼ ${Math.round(SLOT_SECOND_WIND_CHANCE * 100)}%`,
+  ];
+  return `Odds${luck}: ${parts.join(" · ")}`;
 }
 
 export function showSlotMachine(
@@ -108,7 +174,9 @@ export function showSlotMachine(
 ): void {
   const outcome = rollOutcome(ctx);
   const reels = buildReels(outcome, ctx.powerUpPool);
-  const filler = [...new Set<ReelSymbol>([...FILLER, ...ctx.powerUpPool, "life", "miss"])];
+  const filler = [
+    ...new Set<ReelSymbol>([...FILLER, ...ctx.powerUpPool, "life", "miss", "shield", "tokens", "secondWind"]),
+  ];
 
   root.classList.remove("hidden");
   root.innerHTML = `
@@ -127,9 +195,10 @@ export function showSlotMachine(
           LAST CHANCE
         </p>
         <h2 class="slot-title">Lucky Reels</h2>
-        <p class="slot-subtitle">Spin for one more life or a power-up</p>
+        <p class="slot-subtitle">One spin — life, power-up, shields, tokens, or second wind</p>
       </div>
       <div class="slot-machine-body">
+        <p class="slot-odds">${oddsLegend(ctx)}</p>
         <div class="slot-reels" aria-live="polite">
           ${reels
             .map((final, i) => {
@@ -141,7 +210,7 @@ export function showSlotMachine(
                     ${strip
                       .map(
                         (sym) =>
-                          `<span class="slot-symbol slot-symbol--${sym}">${SLOT_SYMBOLS[sym] ?? sym}</span>`
+                          `<span class="slot-symbol slot-symbol--${sym}">${symbolLabel(sym)}</span>`
                       )
                       .join("")}
                   </div>
@@ -151,8 +220,9 @@ export function showSlotMachine(
             .join("")}
         </div>
         <p class="slot-result hidden" id="slot-result"></p>
+        <p class="slot-result-detail hidden" id="slot-result-detail"></p>
         <div class="screen-marquee slot-marquee" aria-hidden="true">
-          <span>♥ LIFE · ✦ PLASMA · ⚡ POWER · — MISS</span>
+          <span>♥ LIFE · ✦ POWER · ◆ SHIELDS · ◎ TOKENS · ☼ WIND</span>
         </div>
         <button type="button" class="btn btn-primary slot-spin btn-deploy" id="slot-spin">
           <span class="btn-deploy-label">Spin</span>
@@ -168,6 +238,7 @@ export function showSlotMachine(
   const spinBtn = root.querySelector<HTMLButtonElement>("#slot-spin")!;
   const continueBtn = root.querySelector<HTMLButtonElement>("#slot-continue")!;
   const resultEl = root.querySelector<HTMLParagraphElement>("#slot-result")!;
+  const detailEl = root.querySelector<HTMLParagraphElement>("#slot-result-detail")!;
   const reelEls = [...root.querySelectorAll<HTMLElement>(".slot-reel-strip")];
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let spinning = false;
@@ -185,6 +256,8 @@ export function showSlotMachine(
     resultEl.textContent = outcomeMessage(outcome);
     resultEl.className = `slot-result ${outcomeClass(outcome)}`;
     resultEl.classList.remove("hidden");
+    detailEl.textContent = outcomeDetail(outcome);
+    detailEl.classList.remove("hidden");
     spinBtn.classList.add("hidden");
     continueBtn.classList.remove("hidden");
     const panel = root.querySelector(".slot-machine-panel");

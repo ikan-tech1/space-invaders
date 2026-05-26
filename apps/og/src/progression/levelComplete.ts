@@ -5,6 +5,8 @@ export interface LevelChallengeResult {
   bonus: number;
 }
 
+import type { CampaignBeat } from "./campaignNarrative";
+
 export interface LevelCompleteReport {
   level: number;
   levelScore: number;
@@ -24,4 +26,6 @@ export interface LevelCompleteReport {
   /** Endless mode payout multiplier applied this level (1 = none). */
   endlessTokenMult: number;
   gameMode: "campaign" | "endless";
+  /** Shown after boss milestone clears in campaign mode. */
+  narrativeBeat?: CampaignBeat | null;
 }

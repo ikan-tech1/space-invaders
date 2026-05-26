@@ -18,26 +18,26 @@ export const ENDLESS_CONSUMABLES: EndlessConsumable[] = [
     id: "mult_boost",
     name: "Mult Boost",
     description: "+0.15 endless token multiplier next level",
-    cost: 20,
+    cost: 24,
     maxPerInterstitial: 1,
   },
   {
     id: "iron_shield",
     name: "Iron Shield",
     description: "Add a bonus shield bunker at level start",
-    cost: 18,
+    cost: 20,
   },
   {
     id: "score_surge",
     name: "Score Surge",
     description: "+25% score from kills next level",
-    cost: 16,
+    cost: 18,
   },
   {
     id: "alien_slow",
     name: "Alien Slow",
     description: "Aliens march 20% slower for one level",
-    cost: 14,
+    cost: 16,
   },
 ];
 

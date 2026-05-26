@@ -171,12 +171,41 @@ export class CanvasRenderer {
     drawSprite(ctx, sprite, x - ox, y - oy, color, mini ? 2 : 3);
 
     if (boss.telegraphTimer > 0) {
-      const pulse = 0.35 + Math.sin(Date.now() / 80) * 0.25;
+      const maxT = boss.phase === 2 ? 0.55 : 0.75;
+      const intensity = Math.min(1, boss.telegraphTimer / maxT);
+      const pulse = 0.35 + Math.sin(Date.now() / 60) * 0.3 * intensity;
+      const radius = (mini ? 38 : 52) + (1 - intensity) * 12;
+
+      ctx.save();
       ctx.strokeStyle = `rgba(255, 68, 102, ${pulse})`;
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(x, y + 10, mini ? 38 : 52, 0, Math.PI * 2);
+      ctx.arc(x, y + 10, radius, 0, Math.PI * 2);
       ctx.stroke();
+
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = `rgba(255, 210, 74, ${pulse * 0.75})`;
+      ctx.beginPath();
+      ctx.arc(x, y + 10, radius + 10, 0, Math.PI * 2);
+      ctx.stroke();
+
+      const chevronY = y + (mini ? 52 : 68);
+      for (let i = -2; i <= 2; i++) {
+        const cx = x + i * (mini ? 16 : 22);
+        ctx.fillStyle = `rgba(255, 68, 102, ${0.25 + pulse * 0.55})`;
+        ctx.beginPath();
+        ctx.moveTo(cx, chevronY);
+        ctx.lineTo(cx - 6, chevronY - 10);
+        ctx.lineTo(cx + 6, chevronY - 10);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      const vignette = pulse * 0.18 * intensity;
+      ctx.fillStyle = `rgba(255, 68, 102, ${vignette})`;
+      ctx.fillRect(0, 0, CANVAS_WIDTH, 28);
+      ctx.fillRect(0, CANVAS_HEIGHT - 36, CANVAS_WIDTH, 36);
+      ctx.restore();
     }
 
     const hpPct = boss.hp / boss.maxHp;

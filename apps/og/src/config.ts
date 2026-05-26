@@ -74,9 +74,13 @@ export const WAVE_BANNER_MS = 1400;
 export const INVULN_TIME = 2;
 /** Max lives including slot-machine bonus. */
 export const SLOT_MAX_LIVES = 5;
-/** Slot outcome weights (must sum to ≤ 1; remainder is miss). */
-export const SLOT_LIFE_CHANCE = 0.15;
-export const SLOT_POWERUP_CHANCE = 0.25;
+/** Slot outcome weights (must sum to ≤ 1; remainder is miss). Lucky Reels upgrade scales life + power only. */
+export const SLOT_LIFE_CHANCE = 0.14;
+export const SLOT_POWERUP_CHANCE = 0.22;
+export const SLOT_SHIELD_CHANCE = 0.1;
+export const SLOT_TOKEN_CHANCE = 0.08;
+export const SLOT_SECOND_WIND_CHANCE = 0.06;
+export const SLOT_TOKEN_PAYOUT = 8;
 
 export const POWERUP_LABELS: Record<PowerUpType, string> = {
   rapid: "Rapid Pulse",
