@@ -60,31 +60,62 @@ export function createSettingsScreen(
       root.innerHTML = renderSubCabinetShell({
         headerHtml: renderSubHeader("Settings", "Cabinet configuration", "— CONFIG —"),
         bodyHtml: `
-          <section class="panel cabinet-panel">
+          <section class="panel cabinet-panel settings-panel">
             <h2 class="panel-label">Audio &amp; Controls</h2>
-            <div class="settings-row">
-              <label for="vol">Master volume</label>
-              <input type="range" id="vol" min="0" max="1" step="0.05" value="${s.volume}" />
-            </div>
-            <div class="settings-row">
-              <label for="sfx">SFX volume</label>
-              <input type="range" id="sfx" min="0" max="1" step="0.05" value="${s.sfxVolume}" />
-            </div>
-            <div class="settings-row">
-              <label for="ui">UI / slot volume</label>
-              <input type="range" id="ui" min="0" max="1" step="0.05" value="${s.uiVolume}" />
-            </div>
-            <div class="settings-row">
-              <label for="touch">Touch control size</label>
-              <input type="range" id="touch" min="0.8" max="1.4" step="0.1" value="${s.touchScale}" />
-            </div>
-            <div class="settings-row">
-              <label for="mute">Mute</label>
-              <input type="checkbox" id="mute" ${s.muted ? "checked" : ""} />
+            <div class="settings-cabinet">
+              <div class="settings-row settings-row--slider">
+                <label for="vol">Master volume</label>
+                <div class="cabinet-slider">
+                  <input type="range" id="vol" min="0" max="1" step="0.05" value="${s.volume}" style="--pct: ${Math.round(s.volume * 100)}%" />
+                  <span class="cabinet-slider-value" data-for="vol">${Math.round(s.volume * 100)}%</span>
+                </div>
+              </div>
+              <div class="settings-row settings-row--slider">
+                <label for="sfx">SFX volume</label>
+                <div class="cabinet-slider">
+                  <input type="range" id="sfx" min="0" max="1" step="0.05" value="${s.sfxVolume}" style="--pct: ${Math.round(s.sfxVolume * 100)}%" />
+                  <span class="cabinet-slider-value" data-for="sfx">${Math.round(s.sfxVolume * 100)}%</span>
+                </div>
+              </div>
+              <div class="settings-row settings-row--slider">
+                <label for="ui">UI / slot volume</label>
+                <div class="cabinet-slider">
+                  <input type="range" id="ui" min="0" max="1" step="0.05" value="${s.uiVolume}" style="--pct: ${Math.round(s.uiVolume * 100)}%" />
+                  <span class="cabinet-slider-value" data-for="ui">${Math.round(s.uiVolume * 100)}%</span>
+                </div>
+              </div>
+              <div class="settings-row settings-row--slider">
+                <label for="touch">Touch control size</label>
+                <div class="cabinet-slider">
+                  <input type="range" id="touch" min="0.8" max="1.4" step="0.1" value="${s.touchScale}" style="--pct: ${Math.round(((s.touchScale - 0.8) / 0.6) * 100)}%" />
+                  <span class="cabinet-slider-value" data-for="touch">${s.touchScale.toFixed(1)}×</span>
+                </div>
+              </div>
+              <div class="settings-row settings-row--toggle">
+                <label for="mute">Mute all audio</label>
+                <label class="cabinet-toggle">
+                  <input type="checkbox" id="mute" ${s.muted ? "checked" : ""} />
+                  <span class="cabinet-toggle-track" aria-hidden="true"></span>
+                </label>
+              </div>
             </div>
           </section>`,
         footerHtml: renderSubBackFooter(),
       });
+      const syncSliderUi = (id: string, display: string): void => {
+        const input = root.querySelector(`#${id}`) as HTMLInputElement | null;
+        const label = root.querySelector(`.cabinet-slider-value[data-for="${id}"]`);
+        if (!input || !label) return;
+        if (id === "touch") {
+          const pct = Math.round(((parseFloat(input.value) - 0.8) / 0.6) * 100);
+          input.style.setProperty("--pct", `${pct}%`);
+          label.textContent = `${parseFloat(input.value).toFixed(1)}×`;
+        } else {
+          const pct = Math.round(parseFloat(input.value) * 100);
+          input.style.setProperty("--pct", `${pct}%`);
+          label.textContent = `${pct}%`;
+        }
+      };
       const save = (): void => {
         const settings: GameSettings = {
           volume: parseFloat((root.querySelector("#vol") as HTMLInputElement).value),
@@ -95,10 +126,22 @@ export function createSettingsScreen(
         };
         repo.saveSettings(settings);
       };
-      root.querySelector("#vol")?.addEventListener("input", save);
-      root.querySelector("#sfx")?.addEventListener("input", save);
-      root.querySelector("#ui")?.addEventListener("input", save);
-      root.querySelector("#touch")?.addEventListener("input", save);
+      root.querySelector("#vol")?.addEventListener("input", () => {
+        syncSliderUi("vol", "%");
+        save();
+      });
+      root.querySelector("#sfx")?.addEventListener("input", () => {
+        syncSliderUi("sfx", "%");
+        save();
+      });
+      root.querySelector("#ui")?.addEventListener("input", () => {
+        syncSliderUi("ui", "%");
+        save();
+      });
+      root.querySelector("#touch")?.addEventListener("input", () => {
+        syncSliderUi("touch", "×");
+        save();
+      });
       root.querySelector("#mute")?.addEventListener("change", save);
       root.querySelector("[data-back]")?.addEventListener("click", onBack);
     },
@@ -111,20 +154,57 @@ export function createHighScoresScreen(repo: LocalStorageRepo, onBack: () => voi
     id: "highScores",
     mount(root) {
       const scores = repo.getHighScores();
-      const rows =
+      const podiumSlots = [
+        { rank: 2, medal: "🥈", className: "high-score-podium-slot--silver" },
+        { rank: 1, medal: "🥇", className: "high-score-podium-slot--gold" },
+        { rank: 3, medal: "🥉", className: "high-score-podium-slot--bronze" },
+      ];
+      const podiumHtml =
         scores.length === 0
-          ? '<li class="records-empty">No scores yet — go play!</li>'
+          ? ""
+          : `<div class="high-score-podium" aria-label="Top three scores">
+              ${podiumSlots
+                .map(({ rank, medal, className }) => {
+                  const entry = scores[rank - 1];
+                  if (!entry) {
+                    return `<div class="high-score-podium-slot ${className} high-score-podium-slot--empty">
+                      <span class="high-score-podium-medal" aria-hidden="true">${medal}</span>
+                      <span class="high-score-podium-rank">#${rank}</span>
+                      <span class="high-score-podium-empty">—</span>
+                    </div>`;
+                  }
+                  return `<div class="high-score-podium-slot ${className}">
+                    <span class="high-score-podium-medal" aria-hidden="true">${medal}</span>
+                    <span class="high-score-podium-rank">#${rank}</span>
+                    <strong class="high-score-podium-initials">${entry.initials}</strong>
+                    <span class="high-score-podium-score">${entry.score.toLocaleString()}</span>
+                    <span class="high-score-podium-wave">L${entry.wave}</span>
+                  </div>`;
+                })
+                .join("")}
+            </div>`;
+      const restRows =
+        scores.length <= 3
+          ? ""
           : scores
+              .slice(3)
               .map(
                 (e, i) =>
-                  `<li><span class="records-rank">${i + 1}. ${e.initials}</span><span class="records-score">${e.score.toLocaleString()} · L${e.wave}</span></li>`
+                  `<li><span class="records-rank">${i + 4}. ${e.initials}</span><span class="records-score">${e.score.toLocaleString()} · L${e.wave}</span></li>`
               )
               .join("");
+      const listHtml =
+        scores.length === 0
+          ? '<li class="records-empty">No scores yet — go play!</li>'
+          : restRows;
       root.innerHTML = renderSubCabinetShell({
+        screenClass: "high-scores-screen",
         headerHtml: renderSubHeader("High Scores", "Hall of fame", "— TOP PLAYERS —"),
         bodyHtml: `
+          ${podiumHtml}
           <section class="panel cabinet-panel panel-flush">
-            <ul class="high-score-list">${rows}</ul>
+            <h2 class="panel-label">${scores.length > 3 ? "All records" : scores.length ? "Record board" : "Records"}</h2>
+            <ul class="high-score-list">${listHtml}</ul>
           </section>`,
         footerHtml: renderSubBackFooter(),
       });
@@ -201,13 +281,16 @@ export function createDailyOpsScreen(onBack: () => void): Screen {
       const countdown = formatCountdown(msUntilMidnight());
       const taskRows = tasks
         .map(
-          (t) => `
+          (t, i) => `
         <li class="daily-ops-task ${dailyDone ? "daily-ops-task--done" : ""}" data-daily-id="${t.id}">
+          <span class="daily-ops-task-index" aria-hidden="true">${String(i + 1).padStart(2, "0")}</span>
           <span class="daily-ops-task-icon" aria-hidden="true">${dailyDone ? "✓" : "◎"}</span>
           <div class="daily-ops-task-body">
-            <strong>${t.title}</strong>
+            <div class="daily-ops-task-head">
+              <strong>${t.title}</strong>
+              <span class="daily-ops-task-badge">+${t.tokenReward} ◎</span>
+            </div>
             <p>${t.description}</p>
-            <span class="daily-ops-task-reward">+${t.tokenReward} ◎</span>
           </div>
         </li>`
         )
@@ -224,23 +307,23 @@ export function createDailyOpsScreen(onBack: () => void): Screen {
         bodyHtml: `
           <section class="panel cabinet-panel daily-ops-hero">
             <div class="daily-ops-stats">
-              <div class="daily-ops-stat">
+              <div class="daily-ops-stat daily-ops-stat--warm">
                 <span class="daily-ops-stat-label">Streak</span>
-                <strong class="daily-ops-stat-value">${streak} day${streak === 1 ? "" : "s"}</strong>
+                <strong class="daily-ops-stat-value">${streak}<span class="daily-ops-stat-unit">d</span></strong>
               </div>
-              <div class="daily-ops-stat">
+              <div class="daily-ops-stat daily-ops-stat--cyan">
                 <span class="daily-ops-stat-label">Resets in</span>
                 <strong class="daily-ops-stat-value daily-ops-countdown" data-countdown>${countdown}</strong>
               </div>
-              <div class="daily-ops-stat">
-                <span class="daily-ops-stat-label">Reward</span>
+              <div class="daily-ops-stat daily-ops-stat--gold">
+                <span class="daily-ops-stat-label">Pool</span>
                 <strong class="daily-ops-stat-value">+${tasks.reduce((s, t) => s + t.tokenReward, 0)} ◎</strong>
               </div>
             </div>
-            ${dailyDone ? '<p class="daily-ops-complete-banner">All ops complete — see you at midnight</p>' : ""}
+            ${dailyDone ? '<p class="daily-ops-complete-banner"><span class="daily-ops-complete-pill">Complete</span> All ops finished — see you at midnight</p>' : ""}
           </section>
           <section class="panel cabinet-panel">
-            <h2 class="panel-label">Today's objectives</h2>
+            <h2 class="panel-label">Today's objectives <span class="panel-label-sub">${tasks.length} tasks</span></h2>
             <ul class="daily-ops-list">${taskRows}</ul>
             <p class="daily-challenge-hint">Finish any objective during a run · Resets at local midnight</p>
           </section>
@@ -297,6 +380,22 @@ export function createChallengesScreen(onBack: () => void): Screen {
           "— TROPHY BOARD —"
         ),
         bodyHtml: `
+          <section class="panel cabinet-panel challenges-trophy-hero">
+            <div class="challenges-trophy-stats">
+              <div class="challenges-trophy-stat">
+                <span class="challenges-trophy-stat-label">Campaign</span>
+                <strong class="challenges-trophy-stat-value">${doneCampaign}<span class="challenges-trophy-stat-of">/${OG_CHALLENGES.length}</span></strong>
+              </div>
+              <div class="challenges-trophy-stat">
+                <span class="challenges-trophy-stat-label">Weekly</span>
+                <strong class="challenges-trophy-stat-value">${doneWeekly}<span class="challenges-trophy-stat-of">/${WEEKLY_CHALLENGES.length}</span></strong>
+              </div>
+              <div class="challenges-trophy-stat challenges-trophy-stat--gold">
+                <span class="challenges-trophy-stat-label">Stars</span>
+                <strong class="challenges-trophy-stat-value">★ ${meta.stars}</strong>
+              </div>
+            </div>
+          </section>
           <section class="panel cabinet-panel">
             <h2 class="panel-label">Weekly ops <span class="panel-label-sub">Resets Monday</span></h2>
             <ul class="challenge-list">${weeklyRows}</ul>
@@ -342,12 +441,14 @@ export function createGameModesScreen(onBack: () => void): Screen {
     mount(root) {
       const tiles = GAME_MODE_TILES.map(
         (m) => `
-        <button type="button" class="modes-tile modes-tile--locked" data-mode="${m.id}" disabled>
-          <span class="modes-tile-lock" aria-hidden="true">🔒</span>
-          <span class="modes-tile-icon">${m.icon}</span>
-          <span class="modes-tile-label">${m.name}</span>
-          <span class="modes-tile-meta">Coming soon</span>
-        </button>`
+        <div class="menu-nav-tile menu-nav-tile--static menu-nav-tile--locked" data-mode="${m.id}" aria-disabled="true">
+          <span class="menu-nav-tile-icon" aria-hidden="true">${m.icon}</span>
+          <span class="menu-nav-tile-body">
+            <span class="menu-nav-tile-title">${m.name}</span>
+            <span class="menu-nav-tile-subtitle">Alternate ruleset</span>
+          </span>
+          <span class="menu-nav-tile-badge">Soon</span>
+        </div>`
       ).join("");
 
       root.innerHTML = renderSubCabinetShell({
@@ -356,7 +457,7 @@ export function createGameModesScreen(onBack: () => void): Screen {
         bodyHtml: `
           <section class="panel cabinet-panel">
             <p class="modes-intro">Locked modes are planned in <code>docs/GAME_MODES.md</code>. Campaign &amp; Endless remain the live ways to play.</p>
-            <div class="modes-grid">${tiles}</div>
+            <div class="modes-grid menu-nav-grid-core">${tiles}</div>
           </section>`,
         footerHtml: renderSubBackFooter(),
       });
@@ -368,6 +469,9 @@ export function createGameModesScreen(onBack: () => void): Screen {
 
 export function createArmoryScreen(onBack: () => void): Screen {
   let previewCleanup: (() => void) | undefined;
+  let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let saveChipHideTimer: ReturnType<typeof setTimeout> | null = null;
+  let callsignDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   const armoryEggs = new EasterEggRegistry();
 
   return {
@@ -375,15 +479,14 @@ export function createArmoryScreen(onBack: () => void): Screen {
     mount(root) {
       previewCleanup?.();
       const meta = loadOgMeta();
-      const equippedShip = meta.equippedShip;
-      const equippedGun = meta.equippedGun;
-      let previewShip: ShipId = equippedShip;
-      let previewGun: ArmoryGunId = equippedGun;
+      let previewShip: ShipId = meta.equippedShip;
+      let previewGun: ArmoryGunId = meta.equippedGun;
+      let saveChipLit = false;
 
       const renderCompare = (): string => {
-        const eqShip = SHIP_PROFILES[equippedShip];
+        const eqShip = SHIP_PROFILES[meta.equippedShip];
         const pvShip = SHIP_PROFILES[previewShip];
-        const eqGunStats = getGunCompareStats(equippedGun);
+        const eqGunStats = getGunCompareStats(meta.equippedGun);
         const pvGunStats = getGunCompareStats(previewGun);
         const shipDiff = (a: number, b: number, inv = false) => {
           const d = b - a;
@@ -399,7 +502,8 @@ export function createArmoryScreen(onBack: () => void): Screen {
             <span class="armory-stat-chip-arrow">→</span>
             <span class="armory-stat-chip-pv">${pv}</span>${delta}
           </span>`;
-        const hasPreviewDelta = previewShip !== equippedShip || previewGun !== equippedGun;
+        const hasPreviewDelta =
+          previewShip !== meta.equippedShip || previewGun !== meta.equippedGun;
         return `
           <section class="panel cabinet-panel armory-compare ${hasPreviewDelta ? "armory-compare--active" : ""}" data-compare-panel>
             <h2 class="panel-label">Loadout compare</h2>
@@ -407,7 +511,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
               <div class="armory-compare-chip armory-compare-chip--equipped">
                 <span class="armory-compare-tag">Equipped</span>
                 <strong>${eqShip.name}</strong>
-                <span class="armory-compare-gun">${GUN_VOLLEY_LABELS[equippedGun]}</span>
+                <span class="armory-compare-gun">${GUN_VOLLEY_LABELS[meta.equippedGun]}</span>
               </div>
               <span class="armory-compare-vs" aria-hidden="true">⇄</span>
               <div class="armory-compare-chip armory-compare-chip--preview ${hasPreviewDelta ? "armory-compare-chip--highlight" : ""}">
@@ -417,13 +521,13 @@ export function createArmoryScreen(onBack: () => void): Screen {
               </div>
             </div>
             <div class="armory-stat-chips">
-              ${statChip("Speed", `${Math.round(eqShip.speedMult * 100)}%`, `${Math.round(pvShip.speedMult * 100)}%`, previewShip !== equippedShip ? shipDiff(eqShip.speedMult, pvShip.speedMult) : "")}
-              ${statChip("Fire", `${Math.round(eqShip.fireCooldownMult * 100)}%`, `${Math.round(pvShip.fireCooldownMult * 100)}%`, previewShip !== equippedShip ? shipDiff(eqShip.fireCooldownMult, pvShip.fireCooldownMult, true) : "")}
-              ${statChip("Hull", `${Math.round(eqShip.hitboxScale * 100)}%`, `${Math.round(pvShip.hitboxScale * 100)}%`, previewShip !== equippedShip ? shipDiff(eqShip.hitboxScale, pvShip.hitboxScale, true) : "")}
-              ${statChip("Volley", `${eqGunStats.volleySize}`, `${pvGunStats.volleySize}`, previewGun !== equippedGun && pvGunStats.volleySize !== eqGunStats.volleySize ? `<span class="compare-chip compare-chip--good">+${pvGunStats.volleySize - eqGunStats.volleySize}</span>` : "")}
+              ${statChip("Speed", `${Math.round(eqShip.speedMult * 100)}%`, `${Math.round(pvShip.speedMult * 100)}%`, previewShip !== meta.equippedShip ? shipDiff(eqShip.speedMult, pvShip.speedMult) : "")}
+              ${statChip("Fire", `${Math.round(eqShip.fireCooldownMult * 100)}%`, `${Math.round(pvShip.fireCooldownMult * 100)}%`, previewShip !== meta.equippedShip ? shipDiff(eqShip.fireCooldownMult, pvShip.fireCooldownMult, true) : "")}
+              ${statChip("Hull", `${Math.round(eqShip.hitboxScale * 100)}%`, `${Math.round(pvShip.hitboxScale * 100)}%`, previewShip !== meta.equippedShip ? shipDiff(eqShip.hitboxScale, pvShip.hitboxScale, true) : "")}
+              ${statChip("Volley", `${eqGunStats.volleySize}`, `${pvGunStats.volleySize}`, previewGun !== meta.equippedGun && pvGunStats.volleySize !== eqGunStats.volleySize ? `<span class="compare-chip compare-chip--good">+${pvGunStats.volleySize - eqGunStats.volleySize}</span>` : "")}
               ${statChip("Tier", eqGunStats.cooldownTier, pvGunStats.cooldownTier)}
             </div>
-            <p class="armory-compare-hint">Tap a ship or gun card to preview stats before equipping.</p>
+            <p class="armory-compare-hint">${hasPreviewDelta ? "Preview differs from equipped loadout — use Apply changes below to commit." : "Tap a ship or gun card to preview stats before equipping."}</p>
           </section>`;
       };
 
@@ -484,7 +588,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
       const renderHangarHero = (): string => {
         const s = SHIP_PROFILES[previewShip];
         const owned = meta.unlockedShips.includes(previewShip);
-        const equipped = equippedShip === previewShip;
+        const equipped = meta.equippedShip === previewShip;
         const cs = getPreviewCosmetics().callsign;
         const csHtml = cs ? ` · <span class="hangar-callsign">${cs}</span>` : "";
         return `
@@ -508,11 +612,11 @@ export function createArmoryScreen(onBack: () => void): Screen {
                 <div class="hangar-hero-actions">
                   ${
                     equipped
-                      ? '<span class="armory-equipped-badge hangar-equipped-badge">Selected for next run</span>'
+                      ? '<span class="armory-equipped-badge hangar-equipped-badge">Equipped</span>'
                       : owned
-                        ? `<button type="button" class="btn btn-primary hangar-select-btn" data-equip-ship="${previewShip}">Select ship</button>`
+                        ? `<button type="button" class="btn btn-primary hangar-select-btn" data-equip-ship="${previewShip}">Equip ship</button>`
                         : `<button type="button" class="btn btn-primary btn-token hangar-select-btn" data-buy-ship="${previewShip}" ${meta.tokens < s.tokenCost ? "disabled" : ""}>
-                            Unlock &amp; select · ${s.tokenCost === 0 ? "Free" : `${s.tokenCost} ◎`}
+                            Unlock &amp; equip · ${s.tokenCost === 0 ? "Free" : `${s.tokenCost} ◎`}
                           </button>`
                   }
                 </div>
@@ -527,7 +631,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
           .map((id) => {
             const s = SHIP_PROFILES[id];
             const owned = meta.unlockedShips.includes(id);
-            const equipped = equippedShip === id;
+            const equipped = meta.equippedShip === id;
             const selected = previewShip === id;
             const speedPct = Math.round(s.speedMult * 100);
             const firePct = Math.round(s.fireCooldownMult * 100);
@@ -544,9 +648,9 @@ export function createArmoryScreen(onBack: () => void): Screen {
             <div class="armory-ship-actions">
               ${
                 equipped
-                  ? '<span class="armory-equipped-badge">Selected</span>'
+                  ? '<span class="armory-equipped-badge">Equipped</span>'
                   : owned
-                    ? `<button type="button" class="btn btn-sm" data-equip-ship="${id}">Select</button>`
+                    ? `<button type="button" class="btn btn-sm" data-equip-ship="${id}">Equip</button>`
                     : `<span class="armory-lock-label">${s.tokenCost} ◎</span>`
               }
             </div>
@@ -572,7 +676,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
       const renderGunCards = (): string =>
         ARMORY_GUNS.map((g) => {
           const owned = meta.unlockedGuns.includes(g.id);
-          const equipped = equippedGun === g.id;
+          const equipped = meta.equippedGun === g.id;
           const selected = previewGun === g.id;
           const label = GUN_VOLLEY_LABELS[g.id];
           const stats = getGunCompareStats(g.id);
@@ -627,6 +731,56 @@ export function createArmoryScreen(onBack: () => void): Screen {
         });
       };
 
+      const updateSaveChipDom = (): void => {
+        const chip = root.querySelector<HTMLElement>("[data-save-chip]");
+        if (!chip) return;
+        chip.textContent = saveChipLit ? "Loadout saved ✓" : "";
+        chip.classList.toggle("armory-save-chip--lit", saveChipLit);
+      };
+
+      const markSaved = (): void => {
+        if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
+        saveDebounceTimer = setTimeout(() => {
+          saveChipLit = true;
+          updateSaveChipDom();
+          if (saveChipHideTimer) clearTimeout(saveChipHideTimer);
+          saveChipHideTimer = setTimeout(() => {
+            saveChipLit = false;
+            updateSaveChipDom();
+          }, 2500);
+        }, 300);
+      };
+
+      const commitPreviewLoadout = (): void => {
+        if (!meta.unlockedShips.includes(previewShip) || !meta.unlockedGuns.includes(previewGun)) return;
+        meta.equippedShip = previewShip;
+        meta.equippedGun = previewGun;
+        saveOgMeta(meta);
+        if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
+        saveChipLit = true;
+        paint();
+        if (saveChipHideTimer) clearTimeout(saveChipHideTimer);
+        saveChipHideTimer = setTimeout(() => {
+          saveChipLit = false;
+          updateSaveChipDom();
+        }, 2500);
+      };
+
+      const renderArmoryFooter = (): string => {
+        const hasPreviewDelta =
+          previewShip !== meta.equippedShip || previewGun !== meta.equippedGun;
+        const canApply =
+          hasPreviewDelta &&
+          meta.unlockedShips.includes(previewShip) &&
+          meta.unlockedGuns.includes(previewGun);
+        return `
+          <div class="armory-footer-bar">
+            <span class="armory-save-chip ${saveChipLit ? "armory-save-chip--lit" : ""}" data-save-chip aria-live="polite">${saveChipLit ? "Loadout saved ✓" : ""}</span>
+            ${canApply ? `<button type="button" class="btn btn-gold armory-apply-btn" data-apply-loadout">Apply changes</button>` : ""}
+            <button type="button" class="btn btn-primary" data-back>Main Menu</button>
+          </div>`;
+      };
+
       const paint = (): void => {
         const scrollEl = root.querySelector<HTMLElement>(".sub-cabinet-scroll");
         const savedScrollTop = scrollEl?.scrollTop ?? 0;
@@ -645,11 +799,11 @@ export function createArmoryScreen(onBack: () => void): Screen {
             </div>
             <div class="armory-wallet-stat">
               <span class="armory-wallet-label">Ship</span>
-              <span class="armory-wallet-value">${SHIP_PROFILES[equippedShip].name}</span>
+              <span class="armory-wallet-value">${SHIP_PROFILES[meta.equippedShip].name}</span>
             </div>
             <div class="armory-wallet-stat">
               <span class="armory-wallet-label">Gun</span>
-              <span class="armory-wallet-value">${GUN_VOLLEY_LABELS[equippedGun]}</span>
+              <span class="armory-wallet-value">${GUN_VOLLEY_LABELS[meta.equippedGun]}</span>
             </div>
           </div>
           ${renderCompare()}
@@ -672,7 +826,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
             <ul class="armory-pickup-list">${pickupRows}</ul>
             <p class="armory-hint">Wallet buys permanent loadout. Run pool (in-game) fuels the supply depot. No rail / pierce weapons.</p>
           </section>`,
-          footerHtml: renderSubBackFooter(),
+          footerHtml: renderArmoryFooter(),
         });
         bindEvents();
         mountArmoryShipSprites(root);
@@ -691,16 +845,20 @@ export function createArmoryScreen(onBack: () => void): Screen {
         const cur = getPreviewCosmetics();
         meta.shipCosmetics[previewShip] = { ...cur, ...patch, hullId: previewShip };
         saveOgMeta(meta);
+        markSaved();
         paint();
       };
 
       const bindEvents = (): void => {
         root.querySelector("[data-back]")?.addEventListener("click", onBack);
+        root.querySelector("[data-apply-loadout]")?.addEventListener("click", commitPreviewLoadout);
 
         const callsignEl = root.querySelector<HTMLInputElement>("#armory-callsign");
         const applyCallsign = (): void => {
           const raw = normalizeCallsign(callsignEl?.value ?? "");
           if (callsignEl) callsignEl.value = raw;
+          const cur = getPreviewCosmetics();
+          if (cur.callsign === raw) return;
           saveCosmetics({ callsign: raw });
           const s = SHIP_PROFILES[previewShip];
           const reward = armoryEggs.onTitanCallsign(raw, s.name);
@@ -728,6 +886,10 @@ export function createArmoryScreen(onBack: () => void): Screen {
           }
         };
         callsignEl?.addEventListener("change", applyCallsign);
+        callsignEl?.addEventListener("input", () => {
+          if (callsignDebounceTimer) clearTimeout(callsignDebounceTimer);
+          callsignDebounceTimer = setTimeout(applyCallsign, 400);
+        });
         callsignEl?.addEventListener("keydown", (e) => {
           if (e.key === "Enter") {
             e.preventDefault();
@@ -747,7 +909,6 @@ export function createArmoryScreen(onBack: () => void): Screen {
               if (meta.stars < COLOR_STAR_COST) return;
               meta.stars -= COLOR_STAR_COST;
               unlockCosmeticColor(meta, color);
-              saveOgMeta(meta);
             }
             if (field === "cockpit") {
               saveCosmetics({ cockpitTint: color as CockpitTintId });
@@ -783,6 +944,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
             meta.equippedShip = id;
             previewShip = id;
             saveOgMeta(meta);
+            markSaved();
             paint();
           });
         });
@@ -793,6 +955,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
             meta.equippedShip = id;
             previewShip = id;
             saveOgMeta(meta);
+            markSaved();
             paint();
           });
         });
@@ -807,6 +970,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
             meta.equippedGun = id;
             previewGun = id;
             saveOgMeta(meta);
+            markSaved();
             paint();
           });
         });
@@ -817,6 +981,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
             meta.equippedGun = id;
             previewGun = id;
             saveOgMeta(meta);
+            markSaved();
             paint();
           });
         });
@@ -828,6 +993,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
             meta.stars -= cost;
             meta.upgrades.push(id);
             saveOgMeta(meta);
+            markSaved();
             paint();
           });
         });
@@ -838,6 +1004,9 @@ export function createArmoryScreen(onBack: () => void): Screen {
     unmount() {
       previewCleanup?.();
       previewCleanup = undefined;
+      if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
+      if (saveChipHideTimer) clearTimeout(saveChipHideTimer);
+      if (callsignDebounceTimer) clearTimeout(callsignDebounceTimer);
     },
   };
 }

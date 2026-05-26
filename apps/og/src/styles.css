@@ -481,69 +481,114 @@ body[data-ui-stage="game"] #starfield-canvas {
 }
 
 .difficulty-options,
-.difficulty-segments {
+.difficulty-segments,
+.difficulty-toggle-group {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-  background: var(--bg);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 3px;
+  gap: 8px;
 }
 
 .difficulty-option,
-.difficulty-segment {
+.difficulty-segment,
+.difficulty-toggle {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 10px 6px;
-  border-radius: var(--radius-sm);
+  gap: 4px;
+  min-height: 72px;
+  padding: 10px 8px;
+  border: 1px solid rgba(0, 232, 245, 0.14);
+  border-radius: var(--radius-md);
+  background: rgba(6, 10, 20, 0.55);
   cursor: pointer;
-  transition: background 0.15s, box-shadow 0.15s;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  text-align: center;
+}
+
+.difficulty-toggle-icon {
+  font-size: 1rem;
+  line-height: 1;
+  opacity: 0.75;
+}
+
+.difficulty-toggle-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.difficulty-toggle-label,
+.difficulty-segment-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  transition: color 0.15s;
+}
+
+.difficulty-toggle-desc {
+  font-size: 0.52rem;
+  line-height: 1.35;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  opacity: 0.85;
+  max-width: 11em;
 }
 
 .difficulty-segment input,
-.difficulty-option input {
+.difficulty-option input,
+.difficulty-toggle input {
   position: absolute;
   opacity: 0;
   width: 0;
   height: 0;
 }
 
-.difficulty-segment-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  transition: color 0.15s;
-}
-
 .difficulty-option.selected,
-.difficulty-segment.selected {
-  background: rgba(0, 240, 255, 0.12);
-  box-shadow: inset 0 0 0 1px var(--accent);
+.difficulty-segment.selected,
+.difficulty-toggle.selected {
+  background: linear-gradient(180deg, rgba(255, 210, 74, 0.22) 0%, rgba(255, 210, 74, 0.1) 100%);
+  border-color: rgba(255, 210, 74, 0.55);
+  box-shadow:
+    0 0 16px rgba(255, 210, 74, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
 }
 
 .difficulty-option.selected .difficulty-segment-label,
-.difficulty-segment.selected .difficulty-segment-label {
-  color: var(--accent);
+.difficulty-segment.selected .difficulty-segment-label,
+.difficulty-toggle.selected .difficulty-toggle-label {
+  color: var(--gold);
 }
 
-.difficulty-segment[data-diff="insane"].selected {
-  background: rgba(255, 68, 102, 0.12);
-  box-shadow: inset 0 0 0 1px var(--danger);
+.difficulty-toggle.selected .difficulty-toggle-icon {
+  opacity: 1;
+  filter: drop-shadow(0 0 6px rgba(255, 210, 74, 0.45));
 }
 
-.difficulty-segment[data-diff="insane"].selected .difficulty-segment-label {
+.difficulty-toggle.selected .difficulty-toggle-desc {
+  color: rgba(232, 244, 255, 0.72);
+}
+
+.difficulty-toggle[data-diff="insane"].selected {
+  background: linear-gradient(180deg, rgba(255, 68, 102, 0.2) 0%, rgba(255, 68, 102, 0.08) 100%);
+  border-color: rgba(255, 68, 102, 0.55);
+  box-shadow:
+    0 0 16px rgba(255, 68, 102, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.difficulty-toggle[data-diff="insane"].selected .difficulty-toggle-label {
   color: var(--danger);
 }
 
-.difficulty-option input {
-  position: static;
-  opacity: 1;
-  accent-color: var(--accent);
+.difficulty-toggle:hover:not(.selected),
+.difficulty-segment:hover:not(.selected) {
+  border-color: rgba(0, 232, 245, 0.28);
+  background: rgba(0, 232, 245, 0.06);
 }
 
 /* ── Menu / arcade landing ── */
@@ -3799,6 +3844,46 @@ body[data-ui-stage="game"] #starfield-canvas {
   padding: 3px 8px;
   border: 1px solid rgba(61, 255, 138, 0.35);
   border-radius: 999px;
+}
+
+.armory-footer-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.armory-save-chip {
+  min-height: 1.25rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  color: transparent;
+  transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+.armory-save-chip--lit {
+  color: var(--shield);
+  opacity: 1;
+}
+
+.btn-gold {
+  border-color: rgba(255, 210, 74, 0.55);
+  color: var(--gold);
+  background: linear-gradient(180deg, rgba(255, 210, 74, 0.16) 0%, rgba(255, 210, 74, 0.06) 100%);
+  box-shadow: 0 0 16px rgba(255, 210, 74, 0.12);
+}
+
+.btn-gold:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: #fff6d6;
+  box-shadow: var(--glow-gold);
+}
+
+.armory-apply-btn {
+  font-weight: 600;
+  letter-spacing: 0.06em;
 }
 
 .btn-sm {
