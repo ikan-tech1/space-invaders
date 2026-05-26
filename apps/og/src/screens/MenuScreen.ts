@@ -35,11 +35,6 @@ export class MenuScreen implements Screen {
 
     root.innerHTML = `
       <div class="screen menu-screen">
-        <div class="menu-starfield" aria-hidden="true">
-          <span class="menu-starfield-layer menu-starfield-far"></span>
-          <span class="menu-starfield-layer menu-starfield-near"></span>
-        </div>
-
         <header class="arcade-hero menu-cabinet-wrap">
           <div class="arcade-cabinet">
             <div class="arcade-frame" aria-hidden="true">

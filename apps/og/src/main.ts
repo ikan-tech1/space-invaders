@@ -1,4 +1,5 @@
 import "./styles.css";
+import { initSpaceBackdrop, setSpaceBackdropMode } from "./render/spaceBackdrop";
 import type { Difficulty, GameMode } from "./config";
 import { LocalStorageRepo } from "./storage/LocalStorageRepo";
 import { GameScreen } from "./screens/GameScreen";
@@ -13,6 +14,8 @@ import {
   createSettingsScreen,
 } from "./screens/SubScreens";
 import { showSplashIfNeeded } from "./ui/splashScreen";
+
+initSpaceBackdrop();
 
 const repo = new LocalStorageRepo();
 let difficulty: Difficulty = "classic";
@@ -44,6 +47,7 @@ function showMenu(): void {
 }
 
 function startGame(continueRun: boolean, mode: GameMode): void {
+  setSpaceBackdropMode("game");
   router.clear();
   gameScreen = new GameScreen({
     repo,
@@ -52,6 +56,7 @@ function startGame(continueRun: boolean, mode: GameMode): void {
     continueRun,
     onGameOver: (score, wave) => {
       gameScreen = null;
+      setSpaceBackdropMode("menu");
       router.show(
         new GameOverScreen({
           repo,
@@ -62,7 +67,10 @@ function startGame(continueRun: boolean, mode: GameMode): void {
         })
       );
     },
-    onExitToMenu: showMenu,
+    onExitToMenu: () => {
+      setSpaceBackdropMode("menu");
+      showMenu();
+    },
   });
   gameScreen.start();
 }

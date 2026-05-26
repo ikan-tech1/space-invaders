@@ -38,7 +38,7 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        background: #0a0e1a;
+        background: transparent;
       }
       #game-layer:not(.hidden) {
         display: flex;
@@ -55,6 +55,8 @@
   </head>
   <body>
     <div id="app">
+      <canvas id="starfield-canvas" aria-hidden="true"></canvas>
+      <div id="space-vignette" aria-hidden="true"></div>
       <div id="screen-root"></div>
       <div id="game-layer" class="hidden">
         <div class="crt-bezel">
@@ -136,6 +138,17 @@
           <button type="button" id="touch-pause" aria-label="Pause">⏸</button>
         </div>
         <p id="keyboard-hint">← → move · SPACE fire · P pause</p>
+      </div>
+    </div>
+    <div id="splash-overlay" class="splash-overlay hidden" role="dialog" aria-label="Loading">
+      <div class="splash-cabinet arcade-cabinet">
+        <p class="splash-eyebrow"><span class="arcade-status-dot"></span> ARCADE BOOT</p>
+        <h1 class="splash-title">SPACE <span class="splash-og">INVADERS</span></h1>
+        <p class="splash-tagline">Original cabinet · deep space link</p>
+        <div class="splash-loader" aria-hidden="true">
+          <span class="splash-loader-bar"></span>
+        </div>
+        <p class="splash-status">Initializing starfield…</p>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
