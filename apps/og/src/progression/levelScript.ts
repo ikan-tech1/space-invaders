@@ -48,11 +48,11 @@ export function getEncounterType(level: number): EncounterType {
 }
 
 function movementForLevel(level: number): { style: AlienMovementStyle; label: string } {
-  if (level <= 2) return { style: "classic", label: "Standard march" };
-  if (level <= 4) return { style: "creep", label: "Creep formation" };
-  if (level <= 6) return { style: "advance", label: "Advance pressure" };
-  if (level <= 8) return { style: "snake", label: "Snake wave" };
-  if (level <= 10) return { style: "pulse", label: "Pulse advance" };
+  if (level <= 4) return { style: "classic", label: "Standard march" };
+  if (level <= 6) return { style: "creep", label: "Creep formation" };
+  if (level <= 8) return { style: "advance", label: "Advance pressure" };
+  if (level <= 10) return { style: "snake", label: "Snake wave" };
+  if (level <= 11) return { style: "pulse", label: "Pulse advance" };
   return { style: "advance", label: "Combined assault" };
 }
 
@@ -62,31 +62,32 @@ export function getMovementConfig(level: number, difficulty: Difficulty): Moveme
     difficulty === "casual" ? 0.72 : difficulty === "insane" ? 1.28 : 1;
   const creepSpeed =
     (MOVEMENT_TUNING.creepSpeedBase +
-      Math.max(0, level - 4) * MOVEMENT_TUNING.creepSpeedPerLevel) *
+      Math.max(0, level - 5) * MOVEMENT_TUNING.creepSpeedPerLevel) *
     diffMult;
   const pulseInterval =
     MOVEMENT_TUNING.pulseIntervalSec -
-    Math.min(3, Math.max(0, level - 8) * 0.35) -
-    (difficulty === "insane" ? 1.2 : difficulty === "casual" ? -1 : 0);
+    Math.min(2, Math.max(0, level - 9) * 0.25) -
+    (difficulty === "insane" ? 1 : difficulty === "casual" ? -1.5 : 0);
   const advanceEdgeHits = Math.max(
-    3,
-    MOVEMENT_TUNING.advanceEdgeHits - Math.floor((level - 6) / 3)
+    4,
+    MOVEMENT_TUNING.advanceEdgeHits - Math.floor((level - 7) / 4)
   );
 
   const highBand = level >= 9;
+  const combinedAssault = level >= 11;
   return {
     style,
     label,
     creepSpeed,
-    pulseInterval: Math.max(6, pulseInterval),
+    pulseInterval: Math.max(10, pulseInterval),
     pulseAdvancePx: MOVEMENT_TUNING.pulseAdvancePx,
     advanceEdgeHits,
     advanceExtraDropPx: MOVEMENT_TUNING.advanceExtraDropPx,
     snakeRippleDelay: MOVEMENT_TUNING.snakeRippleDelay,
-    creepEnabled: style === "creep" || highBand,
+    creepEnabled: style === "creep" || (highBand && !combinedAssault),
     pulseEnabled: style === "pulse" || level >= 11,
-    advanceEnabled: style === "advance" || level >= 10,
-    snakeEnabled: style === "snake" || (level >= 11 && level % 2 === 0),
+    advanceEnabled: style === "advance" || (level >= 10 && level < 12),
+    snakeEnabled: style === "snake" || (level >= 12 && level % 2 === 0),
   };
 }
 
@@ -103,7 +104,7 @@ export function shouldRebuildBunkers(level: number): { rebuild: boolean; reason:
   }
 
   if (level >= 3 && (level - 1) % MOVEMENT_TUNING.bunkerRespawnEvery === 0) {
-    return { rebuild: true, reason: "Bunkers rebuilt" };
+    return { rebuild: true, reason: "Fortified line — bunkers rebuilt" };
   }
 
   return { rebuild: false, reason: "" };

@@ -5,7 +5,55 @@ import {
   SHIELD_COLS,
   SHIELD_ROWS,
 } from "../../config";
-import type { Bullet, Shield } from "./types";
+import { ALIEN_HEIGHT, ALIEN_WIDTH } from "../formations";
+import type { Alien, Bullet, Shield } from "./types";
+
+function rectsOverlap(
+  a: { x: number; y: number; w: number; h: number },
+  b: { x: number; y: number; w: number; h: number }
+): boolean {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function shieldCellRect(shield: Shield, r: number, c: number) {
+  return {
+    x: shield.x + c * SHIELD_CELL,
+    y: shield.y + r * SHIELD_CELL,
+    w: SHIELD_CELL,
+    h: SHIELD_CELL,
+  };
+}
+
+/**
+ * Classic rules: descending aliens chew bunker tiles they touch and cannot
+ * sit inside intact shield cells (no ghosting through bunkers).
+ */
+export function resolveAliensAgainstShields(aliens: Alien[], shields: Shield[]): boolean {
+  let chewed = false;
+  for (const alien of aliens) {
+    if (!alien.alive) continue;
+    const ar = { x: alien.x, y: alien.y, w: ALIEN_WIDTH, h: ALIEN_HEIGHT };
+    let blockTop = Infinity;
+
+    for (const shield of shields) {
+      for (let r = 0; r < SHIELD_ROWS; r++) {
+        for (let c = 0; c < SHIELD_COLS; c++) {
+          if (!shield.cells[r]![c]) continue;
+          const cr = shieldCellRect(shield, r, c);
+          if (!rectsOverlap(ar, cr)) continue;
+          shield.cells[r]![c] = false;
+          chewed = true;
+          blockTop = Math.min(blockTop, cr.y);
+        }
+      }
+    }
+
+    if (blockTop < Infinity) {
+      alien.y = Math.min(alien.y, blockTop - ALIEN_HEIGHT);
+    }
+  }
+  return chewed;
+}
 
 export function createShields(count: number): Shield[] {
   const shields: Shield[] = [];

@@ -158,14 +158,14 @@ export const MOVEMENT_TUNING = {
   /** Durability lost per respawn cycle */
   bunkerDegradePerCycle: 0.1,
   /** Downward drift between horizontal steps (px/s at L5 baseline) */
-  creepSpeedBase: 0.55,
-  creepSpeedPerLevel: 0.18,
+  creepSpeedBase: 0.35,
+  creepSpeedPerLevel: 0.1,
   /** Time-pressure nudge when formation stalls */
-  pulseIntervalSec: 10,
-  pulseAdvancePx: 4,
+  pulseIntervalSec: 14,
+  pulseAdvancePx: 3,
   /** Edge hits before advance-pressure extra drop */
-  advanceEdgeHits: 4,
-  advanceExtraDropPx: 12,
+  advanceEdgeHits: 5,
+  advanceExtraDropPx: 10,
   /** Row ripple delay for snake wave (seconds per row) */
   snakeRippleDelay: 0.045,
   /** Flash duration when bunkers rebuild */

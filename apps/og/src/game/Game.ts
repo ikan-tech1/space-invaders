@@ -46,7 +46,7 @@ import { InputManager } from "../input/InputManager";
 import { ParticleSystem } from "../render/ParticleSystem";
 import { CanvasRenderer } from "../render/CanvasRenderer";
 import { checkEnemyBulletHits, checkPlayerBulletHits } from "./CollisionSystem";
-import { createShields, patchShield, rebuildShields } from "./entities/ShieldGrid";
+import { createShields, patchShield, rebuildShields, resolveAliensAgainstShields } from "./entities/ShieldGrid";
 import type { Alien, Boss, Bullet, PowerUpDrop, Shield, UFO } from "./entities/types";
 import { formationBounds } from "./formations";
 import { LevelDirector } from "../progression/LevelDirector";
@@ -995,7 +995,7 @@ export class Game {
     const slow = this.slowTimer > 0 ? 0.4 : 1;
     const frozen = this.getTimedBuff("freezeAliens") > 0 ? 0 : 1;
     const alienSlow = this.alienSlowActive ? 0.8 : 1;
-    const levelPace = 1 + Math.min(0.14, (this.levelDirector.level - 1) * 0.018);
+    const levelPace = 1 + Math.min(0.1, (this.levelDirector.level - 1) * 0.02);
     const advanceBonus = 1 + this.alienAdvanceBonus;
     const tick = Math.max(
       MIN_ALIEN_TICK,
@@ -1011,7 +1011,7 @@ export class Game {
 
     if (mov.creepEnabled && mov.creepSpeed > 0) {
       const creep = mov.creepSpeed * dt * slow * alienSlow;
-      for (const a of alive) a.y += creep;
+      this.shiftAliensDown(alive, creep);
       const bounds = formationBounds(this.aliens);
       if (bounds.maxY >= this.playerY - 40) this.hitPlayer();
     }
@@ -1020,7 +1020,7 @@ export class Game {
       this.alienPulseTimer += dt;
       if (this.alienPulseTimer >= mov.pulseInterval) {
         this.alienPulseTimer = 0;
-        for (const a of alive) a.y += mov.pulseAdvancePx;
+        this.shiftAliensDown(alive, mov.pulseAdvancePx);
         this.audio.play("alienAggro");
         this.particles.burst(CANVAS_WIDTH / 2, alive[0]!.y + 12, "#ff4466", 8);
         const bounds = formationBounds(this.aliens);
@@ -1055,7 +1055,7 @@ export class Game {
             this.alienEdgeHits % mov.advanceEdgeHits === 0
               ? mov.advanceExtraDropPx
               : 0);
-          for (const a of alive) a.y += drop;
+          this.shiftAliensDown(alive, drop);
           if (
             mov.advanceEnabled &&
             this.alienEdgeHits % mov.advanceEdgeHits === 0
@@ -1120,8 +1120,18 @@ export class Game {
       const rowDelay = a.row * mov.snakeRippleDelay;
       const rowDir = a.row % 2 === 0 ? -this.alienDir : this.alienDir;
       a.x += rowDir * BASE_ALIEN_H_STEP * 0.65;
-      if (rowDelay <= mov.snakeRippleDelay * 2) a.y += ALIEN_STEP_DOWN * 0.85;
-      else a.y += ALIEN_STEP_DOWN;
+      const drop = rowDelay <= mov.snakeRippleDelay * 2 ? ALIEN_STEP_DOWN * 0.85 : ALIEN_STEP_DOWN;
+      a.y += drop;
+    }
+    resolveAliensAgainstShields(this.aliens, this.shields);
+  }
+
+  /** Apply downward alien shift with classic bunker chew / no-ghost collision. */
+  private shiftAliensDown(alive: Alien[], dy: number): void {
+    if (dy <= 0) return;
+    for (const a of alive) a.y += dy;
+    if (resolveAliensAgainstShields(this.aliens, this.shields)) {
+      this.addShake(0.04);
     }
   }
 
@@ -1142,19 +1152,19 @@ export class Game {
   private maybeSpawnWaveReinforcements(dt: number, alive: Alien[]): void {
     const level = this.levelDirector.level;
     if (
-      level < 10 ||
+      level < 12 ||
       this.levelDirector.encounter !== "standard" ||
       alive.length < 4 ||
-      alive.length > 28
+      alive.length > 26
     ) {
       return;
     }
     this.waveReinforceTimer -= dt;
     if (this.waveReinforceTimer > 0) return;
-    this.waveReinforceTimer = 16 - Math.min(6, (level - 10) * 0.8);
+    this.waveReinforceTimer = 22 - Math.min(4, (level - 12) * 0.6);
 
     const bounds = formationBounds(this.aliens);
-    const count = level >= 12 ? 3 : 2;
+    const count = level >= 14 ? 2 : 1;
     for (let i = 0; i < count; i++) {
       this.aliens.push({
         x: bounds.minX + i * 38 + Math.random() * 12,
