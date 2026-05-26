@@ -1587,7 +1587,7 @@ export class Game {
       runTokenPool: this.runTokenPool,
       endlessTokenMult,
       endlessTier,
-      endlessDepth: this.gameMode === "endless" ? this.levelDirector.level : undefined,
+      endlessDepth: this.gameMode === "endless" ? this.meta.endlessBestDepth : undefined,
       endlessNextTierDepth,
       gameMode: this.gameMode,
       narrativeBeat,
