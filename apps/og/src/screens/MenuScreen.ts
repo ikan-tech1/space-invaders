@@ -7,6 +7,7 @@ import {
 } from "../progression/dailyChallenges";
 import { EasterEggRegistry } from "../progression/easterEggs";
 import { loadOgMeta, saveOgMeta } from "../progression/metaStore";
+import { getEndlessTier } from "../progression/endlessProgression";
 import { drainPendingToasts } from "../progression/pendingToasts";
 import { SHIP_PROFILES } from "../progression/ships";
 import type { LocalStorageRepo } from "../storage/LocalStorageRepo";
@@ -41,6 +42,11 @@ export class MenuScreen implements Screen {
     const challengeTotal = OG_CHALLENGES.length;
     const daily = getDailyChallenge();
     const dailyDone = loadDailyCompletedDate() === getDailyDateKey();
+    const endlessTier = getEndlessTier(meta.endlessBestDepth ?? 0);
+    const endlessSub =
+      meta.endlessBestDepth > 0
+        ? `${endlessTier.name} · best L${meta.endlessBestDepth}`
+        : "Survival run · rank up by depth";
 
     root.innerHTML = `
       <div class="screen menu-screen">
@@ -182,7 +188,7 @@ export class MenuScreen implements Screen {
                     meta.endlessUnlocked
                       ? `<button type="button" class="btn btn-endless" data-action="endless">
                           <span class="btn-deploy-label">Endless</span>
-                          <span class="btn-deploy-sub">Survival run</span>
+                          <span class="btn-deploy-sub">${endlessSub}</span>
                         </button>`
                       : ""
                   }

@@ -25,6 +25,9 @@ export interface LevelCompleteReport {
   runTokenPool: number;
   /** Endless mode payout multiplier applied this level (1 = none). */
   endlessTokenMult: number;
+  endlessTier?: string;
+  endlessDepth?: number;
+  endlessNextTierDepth?: number | null;
   gameMode: "campaign" | "endless";
   /** Shown after boss milestone clears in campaign mode. */
   narrativeBeat?: CampaignBeat | null;

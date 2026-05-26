@@ -78,6 +78,12 @@ import {
   type EndlessConsumableId,
 } from "../progression/endlessShop";
 import {
+  collectEndlessMilestones,
+  getEndlessTier,
+  getNextEndlessTier,
+  isEndlessItemUnlocked,
+} from "../progression/endlessProgression";
+import {
   getDailyChallenge,
   getDailyDateKey,
   loadDailyCompletedDate,
@@ -118,6 +124,7 @@ export interface GameCallbacks {
   onTokensChange: (tokens: number) => void;
   onRunPoolChange: (pool: number) => void;
   onEndlessMultChange: (mult: number) => void;
+  onEndlessRankChange: (tierName: string, depth: number, nextDepth: number | null) => void;
   onLoadoutChange: (ship: string, gun: string) => void;
   onSectorBriefing: (level: number) => void;
   onBossWeakPoint: (visible: boolean, label: string) => void;
@@ -282,8 +289,18 @@ export class Game {
     this.callbacks.onWaveChange(this.levelDirector.level);
     this.callbacks.onTokensChange(this.meta.tokens);
     this.callbacks.onRunPoolChange(this.runTokenPool);
-    this.callbacks.onEndlessMultChange(this.getEndlessTokenMult());
+    this.pushEndlessHud();
     this.callbacks.onLoadoutChange(this.getShipLabel(), this.getGunLabel());
+  }
+
+  private pushEndlessHud(): void {
+    if (this.gameMode !== "endless") return;
+    const depth = this.levelDirector.level;
+    const rankDepth = Math.max(depth, this.meta.endlessBestDepth);
+    const tier = getEndlessTier(rankDepth);
+    const next = getNextEndlessTier(rankDepth);
+    this.callbacks.onEndlessMultChange(this.getEndlessTokenMult());
+    this.callbacks.onEndlessRankChange(tier.name, depth, next?.minDepth ?? null);
   }
 
   private getShipProfile() {
@@ -313,6 +330,8 @@ export class Game {
 
   spendInterstitialEndlessTokens(id: EndlessConsumableId): boolean {
     if (this.state !== "levelInterstitial" || this.gameMode !== "endless") return false;
+    const unlockDepth = Math.max(this.meta.endlessBestDepth, this.levelDirector.level);
+    if (!isEndlessItemUnlocked(id, unlockDepth)) return false;
     const item = getEndlessConsumable(id);
     const count = this.interstitialEndlessPurchases.filter((p) => p === id).length;
     const max = item.maxPerInterstitial ?? 99;
@@ -338,6 +357,15 @@ export class Game {
       case "alien_slow":
         this.pendingAlienSlow = true;
         this.callbacks.onToast("Alien slow — march -20% next level!");
+        break;
+      case "depth_cache":
+        this.runTokenPool += 12;
+        this.callbacks.onRunPoolChange(this.runTokenPool);
+        this.callbacks.onToast("Depth cache — +12 ◎ to run pool!");
+        break;
+      case "prestige_spark":
+        this.pendingEndlessMultBoost += 0.25;
+        this.callbacks.onToast("Prestige spark — +0.25× next level!");
         break;
     }
     return true;
@@ -498,6 +526,7 @@ export class Game {
       this.callbacks.onToast("Combo charge — 3× active!");
     }
     this.callbacks.onEndlessMultChange(this.getEndlessTokenMult());
+    this.pushEndlessHud();
     this.showBanner(this.levelDirector.getBanner());
   }
 
@@ -534,7 +563,7 @@ export class Game {
         }
         this.levelDirector.nextLevel();
         this.callbacks.onWaveChange(this.levelDirector.level);
-        this.callbacks.onEndlessMultChange(this.getEndlessTokenMult());
+        this.pushEndlessHud();
         this.startLevel();
       }
       this.particles.update(dt);
@@ -1498,6 +1527,26 @@ export class Game {
       this.meta.campaignCleared = true;
       this.meta.endlessUnlocked = true;
     }
+
+    if (this.gameMode === "endless") {
+      const priorBest = this.meta.endlessBestDepth;
+      const mult = this.getEndlessTokenMult();
+      const claimed = new Set(this.meta.endlessMilestones);
+      const events = collectEndlessMilestones(this.levelDirector.level, priorBest, mult, claimed);
+      for (const ev of events) {
+        if (ev.achievement && !ev.id.startsWith("depth_run_")) {
+          this.meta.endlessMilestones.push(ev.id);
+        }
+        this.callbacks.onToast(ev.toast);
+        if (ev.achievement) queuePendingToast(`Achievement: ${ev.toast}`);
+        if (ev.tokenBonus) {
+          this.runTokenPool += ev.tokenBonus;
+          this.callbacks.onRunPoolChange(this.runTokenPool);
+        }
+      }
+      this.meta.endlessBestDepth = Math.max(priorBest, this.levelDirector.level);
+    }
+
     saveOgMeta(this.meta);
 
     const levelScore = this.levelChallenges.levelScore(this.score - challengeBonus);
@@ -1507,6 +1556,14 @@ export class Game {
 
     const tokensEarnedThisLevel = this.levelTokensEarned;
     const endlessTokenMult = this.getEndlessTokenMult();
+    const rankDepth =
+      this.gameMode === "endless"
+        ? Math.max(this.levelDirector.level, this.meta.endlessBestDepth)
+        : 0;
+    const endlessTier =
+      this.gameMode === "endless" ? getEndlessTier(rankDepth).name : undefined;
+    const endlessNextTierDepth =
+      this.gameMode === "endless" ? (getNextEndlessTier(rankDepth)?.minDepth ?? null) : undefined;
 
     const narrativeBeat =
       this.gameMode === "campaign" && isBoss
@@ -1529,16 +1586,27 @@ export class Game {
       walletTokens: this.meta.tokens,
       runTokenPool: this.runTokenPool,
       endlessTokenMult,
+      endlessTier,
+      endlessDepth: this.gameMode === "endless" ? this.levelDirector.level : undefined,
+      endlessNextTierDepth,
       gameMode: this.gameMode,
       narrativeBeat,
     });
     this.callbacks.onEndlessMultChange(this.getEndlessTokenMult());
+    this.pushEndlessHud();
     this.callbacks.onScoreChange(this.score);
   }
 
   private endGame(campaignWin = false): void {
     this.state = "gameOver";
     this.callbacks.onBossWeakPoint(false, "");
+    if (this.gameMode === "endless") {
+      this.meta.endlessBestDepth = Math.max(
+        this.meta.endlessBestDepth,
+        this.levelDirector.level
+      );
+      saveOgMeta(this.meta);
+    }
     if (!campaignWin) {
       this.audio.play("gameOver");
       this.tryCompleteDailyChallenge();

@@ -81,6 +81,7 @@ export class GameScreen {
     const hudTokens = document.getElementById("hud-tokens")!;
     const hudRunPool = document.getElementById("hud-run-pool")!;
     const hudEndlessWrap = document.getElementById("hud-endless-wrap")!;
+    const hudEndlessTier = document.getElementById("hud-endless-tier")!;
     const hudEndlessMult = document.getElementById("hud-endless-mult")!;
     const hudCombo = document.getElementById("hud-combo")!;
     const hudBuffs = document.getElementById("hud-buffs")!;
@@ -168,12 +169,17 @@ export class GameScreen {
         hudRunPool.textContent = String(pool);
       },
       onEndlessMultChange: (mult) => {
-        if (this.deps.gameMode === "endless" && mult > 1) {
-          hudEndlessWrap.classList.remove("hidden");
+        if (this.deps.gameMode === "endless") {
           hudEndlessMult.textContent = `×${mult.toFixed(1)}`;
-        } else {
-          hudEndlessWrap.classList.add("hidden");
         }
+      },
+      onEndlessRankChange: (tierName, depth, nextDepth) => {
+        if (this.deps.gameMode !== "endless") return;
+        hudEndlessWrap.classList.remove("hidden");
+        hudEndlessTier.textContent = tierName;
+        hudEndlessTier.title = nextDepth
+          ? `${tierName} · L${depth} · next tier L${nextDepth}`
+          : `${tierName} · L${depth} · max rank`;
       },
       onLoadoutChange: (ship, gun) => {
         hudShip.textContent = ship;
@@ -237,11 +243,7 @@ export class GameScreen {
     hudTokens.textContent = String(this.game.meta.tokens);
     hudRunPool.textContent = String(this.game.runTokenPool);
     if (this.deps.gameMode === "endless") {
-      const mult = 1 + Math.min(1.5, (this.game.getSaveData().wave - 1) * 0.08);
-      if (mult > 1) {
-        hudEndlessWrap.classList.remove("hidden");
-        hudEndlessMult.textContent = `×${mult.toFixed(1)}`;
-      }
+      hudEndlessWrap.classList.remove("hidden");
     }
 
     this.maybeShowOnboarding();

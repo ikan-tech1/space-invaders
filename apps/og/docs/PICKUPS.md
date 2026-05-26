@@ -96,22 +96,23 @@ When **Token Magnet** (armory upgrade) or **Magnet Burst** (run consumable) is a
 - Pickups within ~78px of the ship are magnet-pulled with cyan/category spark trails.
 - On collect, a streak of particles runs from the pickup to the ship plus a local burst.
 
-### SFX
-
-| Trigger | Sound |
-|---------|-------|
-| Common / weapon pickup | `powerup` (523→784 Hz) |
-| Curse pickup | `pickupCurse` (low saw) |
-| Economy / tokenBurst | `pickupEconomy` (coin arpeggio) |
-| Rare rarity | `pickupRare` (ascending sine) |
-
 ### Campaign map
 
-`campaignBestLevel` in meta tracks highest cleared stage. Sector select unlocks levels 1 through `best + 1`. Campaign button opens the 4×3 sector grid before launch.
+`campaignBestLevel` in meta tracks highest cleared stage. Sector select unlocks levels 1 through `best + 1`. Campaign button opens the 4×3 sector grid before launch. Progress bar, NEXT marker, and endless-unlock chip shown on the map.
 
 ### Achievements
 
-New challenge badges queue `og_pending_achievement_toasts` and replay as gold achievement toasts when returning to the main menu.
+New challenge badges queue `og_pending_toasts` and replay as gold achievement toasts when returning to the main menu.
+
+### Endless meta
+
+| Feature | Detail |
+|---------|--------|
+| Ranks | Scout L1 · Veteran L5 · Ace L10 · Elite L15 · Legend L20 · Mythic L25 |
+| HUD | Rank name + token mult (×1.0–×2.2) in endless runs |
+| Depth prestige | Every 5 levels cleared → +10 ◎ to run pool |
+| Mult milestones | ×1.3 / ×1.6 / ×1.9 / ×2.2 unlock achievement toasts (once) |
+| Depot tiers | Depth Cache (Veteran L5) · Prestige Spark (Ace L10) — endless interstitial only |
 
 ## Slot machine
 

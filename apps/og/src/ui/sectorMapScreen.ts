@@ -32,6 +32,9 @@ export function createSectorMapScreen(
       const starsMap = meta.campaignStars ?? {};
       const highestClear = meta.campaignBestLevel ?? 0;
       const maxUnlocked = Math.min(CAMPAIGN_MAX_LEVEL, Math.max(1, highestClear + 1));
+      const totalStars = Object.values(starsMap).reduce((s, n) => s + (n ?? 0), 0);
+      const maxStars = CAMPAIGN_MAX_LEVEL * 3;
+      const progressPct = Math.round((highestClear / CAMPAIGN_MAX_LEVEL) * 100);
 
       const sectors = [1, 2, 3, 4].map((sector) => {
         const levels = [1, 2, 3].map((offset) => {
@@ -40,16 +43,18 @@ export function createSectorMapScreen(
           const stars = starsMap[String(level)] ?? 0;
           const unlocked = level <= maxUnlocked;
           const cleared = level <= highestClear;
+          const isNext = level === maxUnlocked && !cleared;
           return `
             <button type="button"
-              class="sector-lvl ${unlocked ? "sector-lvl--unlocked" : "sector-lvl--locked"} ${cleared ? "sector-lvl--cleared" : ""}"
+              class="sector-lvl ${unlocked ? "sector-lvl--unlocked" : "sector-lvl--locked"} ${cleared ? "sector-lvl--cleared" : ""} ${isNext ? "sector-lvl--next" : ""}"
               data-level="${level}"
               ${unlocked ? "" : "disabled"}
-              aria-label="Level ${level} ${cfg.codename}${stars ? `, ${stars} stars` : ""}">
+              aria-label="Level ${level} ${cfg.codename}${stars ? `, ${stars} stars` : ""}${isNext ? ", recommended next" : ""}">
               <span class="sector-lvl-num">L${level}</span>
               <span class="sector-lvl-name">${cfg.codename}</span>
               ${encounterBadge(level)}
               <span class="sector-lvl-stars" aria-hidden="true">${starRow(stars)}</span>
+              ${isNext ? '<span class="sector-lvl-next" aria-hidden="true">NEXT</span>' : ""}
               ${!unlocked ? '<span class="sector-lvl-lock" aria-hidden="true">🔒</span>' : ""}
             </button>`;
         });
@@ -57,8 +62,9 @@ export function createSectorMapScreen(
           (sum, offset) => sum + (starsMap[String((sector - 1) * 3 + offset)] ?? 0),
           0
         );
+        const sectorComplete = sectorStars >= 9;
         return `
-          <section class="sector-block" aria-label="Sector ${sectorRoman(sector)}">
+          <section class="sector-block ${sectorComplete ? "sector-block--complete" : ""}" aria-label="Sector ${sectorRoman(sector)}">
             <header class="sector-block-head">
               <h2 class="sector-block-title">Sector ${sectorRoman(sector)}</h2>
               <span class="sector-block-stars">${sectorStars}/9 ★</span>
@@ -73,11 +79,20 @@ export function createSectorMapScreen(
             <div class="cabinet-mini-glow" aria-hidden="true"></div>
             <p class="cabinet-mini-status"><span class="arcade-status-dot"></span> CAMPAIGN MAP</p>
             <h1 class="screen-title">Sector Select</h1>
-            <p class="screen-subtitle">${highestClear}/${CAMPAIGN_MAX_LEVEL} cleared · pick any unlocked level</p>
+            <p class="screen-subtitle">${highestClear}/${CAMPAIGN_MAX_LEVEL} cleared · ${totalStars}/${maxStars} ★ earned</p>
+            <div class="sector-map-progress" role="progressbar" aria-valuenow="${progressPct}" aria-valuemin="0" aria-valuemax="100" aria-label="Campaign progress">
+              <div class="sector-map-progress-fill" style="width: ${progressPct}%"></div>
+              <span class="sector-map-progress-label">${progressPct}%</span>
+            </div>
+            ${
+              meta.endlessUnlocked
+                ? '<p class="sector-map-endless-unlock"><span class="sector-map-endless-chip">∞ ENDLESS UNLOCKED</span></p>'
+                : `<p class="sector-map-endless-hint">Clear L6 to unlock Endless relay</p>`
+            }
             <div class="screen-marquee" aria-hidden="true"><span>— 12 LEVELS · 4 SECTORS —</span></div>
           </header>
           <div class="sector-map-grid">${sectors.join("")}</div>
-          <p class="sector-map-hint">Bosses at L3, L6, L9, L12. Endless unlocks after L6.</p>
+          <p class="sector-map-hint">Bosses at L3, L6, L9, L12 · tap NEXT for your recommended stage</p>
           <button type="button" class="btn btn-primary" data-back>Main Menu</button>
         </div>`;
 

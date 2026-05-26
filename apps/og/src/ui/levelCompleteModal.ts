@@ -1,6 +1,7 @@
 import type { LevelCompleteReport } from "../progression/levelComplete";
 import { RUN_CONSUMABLES, type RunConsumableId } from "../progression/runShop";
-import { ENDLESS_CONSUMABLES, type EndlessConsumableId } from "../progression/endlessShop";
+import { ENDLESS_CONSUMABLES, getEndlessConsumableTierLabel, type EndlessConsumableId } from "../progression/endlessShop";
+import { isEndlessItemUnlocked } from "../progression/endlessProgression";
 
 export interface LevelCompleteModalOptions {
   onContinue: () => void;
@@ -77,13 +78,16 @@ export function showLevelCompleteModal(
             const count = [...endlessPurchased].filter((id) => id === item.id).length;
             const max = item.maxPerInterstitial ?? 99;
             const soldOut = count >= max;
+            const unlockDepth = report.endlessDepth ?? 0;
+            const locked = !isEndlessItemUnlocked(item.id, unlockDepth);
             const canAfford = report.runTokenPool >= item.cost;
+            const tierLabel = getEndlessConsumableTierLabel(item.id);
             return `
-        <button type="button" class="lc-chip lc-chip--endless ${soldOut ? "lc-chip--sold" : ""} ${!soldOut && canAfford ? "lc-chip--affordable" : ""}"
-          data-endless="${item.id}" ${soldOut || !canAfford ? "disabled" : ""}
-          title="${item.description}">
+        <button type="button" class="lc-chip lc-chip--endless ${soldOut ? "lc-chip--sold" : ""} ${locked ? "lc-chip--locked" : ""} ${!soldOut && !locked && canAfford ? "lc-chip--affordable" : ""}"
+          data-endless="${item.id}" ${soldOut || !canAfford || locked ? "disabled" : ""}
+          title="${locked && tierLabel ? `Unlock at ${tierLabel}` : item.description}">
           <span class="lc-chip-name">${item.name}</span>
-          <span class="lc-chip-cost">${soldOut ? "✓" : `${item.cost} ◎`}</span>
+          <span class="lc-chip-cost">${locked ? tierLabel ?? "🔒" : soldOut ? "✓" : `${item.cost} ◎`}</span>
         </button>`;
           }).join("")
         : "";
@@ -115,6 +119,21 @@ export function showLevelCompleteModal(
           <span class="lc-stat-icon" aria-hidden="true">×</span>
           <span class="lc-stat-label">Endless mult</span>
           <strong class="lc-stat-value lc-stat-value--gold">×${report.endlessTokenMult.toFixed(1)}</strong>
+        </div>`
+        : "";
+
+    const endlessRankTile =
+      report.gameMode === "endless" && report.endlessTier
+        ? `
+        <div class="lc-stat-tile lc-stat-tile--endless-rank">
+          <span class="lc-stat-icon" aria-hidden="true">⬡</span>
+          <span class="lc-stat-label">Endless rank</span>
+          <strong class="lc-stat-value lc-stat-value--cyan">${report.endlessTier}</strong>
+          ${
+            report.endlessNextTierDepth
+              ? `<span class="lc-stat-hint">Next tier L${report.endlessNextTierDepth}</span>`
+              : `<span class="lc-stat-hint">Max rank</span>`
+          }
         </div>`
         : "";
 
@@ -167,6 +186,7 @@ export function showLevelCompleteModal(
             <strong class="lc-stat-value lc-stat-value--token">+${report.tokensEarnedThisLevel}</strong>
           </div>
           ${endlessMultTile}
+          ${endlessRankTile}
           <div class="lc-stat-tile lc-stat-tile--run-pool">
             <span class="lc-stat-icon" aria-hidden="true">⬡</span>
             <span class="lc-stat-label">Run pool</span>

@@ -22,6 +22,10 @@ export interface OgMeta {
   upgrades: OgMetaUpgrade[];
   unlockedPickups: string[];
   badges: string[];
+  /** Best endless depth (level reached) across all runs. */
+  endlessBestDepth: number;
+  /** Claimed endless milestone ids (tiers, depth rewards, mult thresholds). */
+  endlessMilestones: string[];
   equippedShip: ShipId;
   equippedGun: ArmoryGunId;
   unlockedShips: ShipId[];
@@ -40,6 +44,8 @@ const DEFAULT: OgMeta = {
   upgrades: [],
   unlockedPickups: ["rapid", "spread", "shield", "slow"],
   badges: [],
+  endlessBestDepth: 0,
+  endlessMilestones: [],
   equippedShip: "striker",
   equippedGun: "single",
   unlockedShips: ["striker"],
@@ -80,6 +86,10 @@ function migrateMeta(m: OgMeta): OgMeta {
     m.campaignBestLevel = m.campaignCleared ? CAMPAIGN_MAX_LEVEL : 0;
   }
   if (!m.campaignStars) m.campaignStars = {};
+  if (typeof m.endlessBestDepth !== "number" || m.endlessBestDepth < 0) {
+    m.endlessBestDepth = 0;
+  }
+  if (!Array.isArray(m.endlessMilestones)) m.endlessMilestones = [];
   return m;
 }
 
