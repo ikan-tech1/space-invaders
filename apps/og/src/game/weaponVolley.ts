@@ -77,6 +77,11 @@ export function createVolley(profile: GunVolley, px: number, py: number): Bullet
   }
 }
 
+/** True when an on-screen player bullet blocks the classic one-bullet slot. */
+export function playerBulletBlocksSlot(bullets: Bullet[]): boolean {
+  return bullets.some((b) => b.fromPlayer && b.active && !b.spread);
+}
+
 /** Profiles that may fire again before the prior volley leaves the screen. */
 export function profileBypassesBulletSlot(profile: GunVolley): boolean {
   return (

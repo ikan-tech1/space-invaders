@@ -19,7 +19,8 @@ import {
   POWERUP_DURATION,
   POWERUP_LABELS,
   RAPID_FIRE_COOLDOWN,
-  SINGLE_FIRE_DEBOUNCE,
+  SINGLE_BULLET_TOP_EXIT_Y,
+  SINGLE_FIRE_COOLDOWN,
   SLOW_DURATION,
   SLOT_MAX_LIVES,
   UFO_POINTS,
@@ -45,6 +46,7 @@ import { LevelChallengeTracker } from "../progression/levelChallenges";
 import { loadOgMeta, saveOgMeta, type OgMeta } from "../progression/metaStore";
 import {
   createVolley,
+  playerBulletBlocksSlot,
   profileBypassesBulletSlot,
   profileFireCooldownMult,
   type GunVolley,
@@ -294,8 +296,8 @@ export class Game {
     }
 
     this.updateShake(dt);
-    this.updatePlayer(dt);
     this.updateBullets(dt);
+    this.updatePlayer(dt);
     this.updateAliens(dt);
     this.updateUfo(dt);
     this.updateBoss(dt);
@@ -357,6 +359,9 @@ export class Game {
     const rapid = profile === "rapid";
     const plasma = profile === "plasma" || this.plasmaTimer > 0;
     const bypassSlot = profileBypassesBulletSlot(profile);
+    const slotOpen = bypassSlot || !playerBulletBlocksSlot(this.bullets);
+    this.canFire = slotOpen;
+
     const cooldown =
       (rapid
         ? RAPID_FIRE_COOLDOWN
@@ -364,25 +369,23 @@ export class Game {
           ? PLASMA_FIRE_COOLDOWN
           : bypassSlot
             ? PLAYER_FIRE_COOLDOWN
-            : SINGLE_FIRE_DEBOUNCE) *
+            : SINGLE_FIRE_COOLDOWN) *
       profileFireCooldownMult(profile) *
       ship.fireCooldownMult *
       (this.meta.upgrades.includes("fastShot") ? 0.82 : 1) *
       DIFFICULTY_CONFIG[this.difficulty].fireCooldownMult;
     if (this.fireCooldown > 0) this.fireCooldown -= dt;
 
-    if (this.input.isFirePressed() && this.fireCooldown <= 0) {
-      const slotOpen = bypassSlot || this.canFire;
-      if (!slotOpen) return;
+    if (!this.input.isFirePressed() || this.fireCooldown > 0 || !slotOpen) return;
 
-      this.fireVolley(profile);
-      if (this.cloneTimer > 0) {
-        this.bullets.push(...createVolley(profile, this.playerX - 36, this.playerY));
-        this.bullets.push(...createVolley(profile, this.playerX + 36, this.playerY));
-      }
-      this.fireCooldown = cooldown;
-      this.audio.play("shoot");
+    this.fireVolley(profile);
+    if (this.cloneTimer > 0) {
+      this.bullets.push(...createVolley(profile, this.playerX - 36, this.playerY));
+      this.bullets.push(...createVolley(profile, this.playerX + 36, this.playerY));
     }
+    this.fireCooldown = cooldown;
+    this.canFire = bypassSlot;
+    this.audio.play("shoot");
   }
 
   private fireVolley(profile: GunVolley): void {
@@ -438,7 +441,15 @@ export class Game {
 
       b.x += (b.vx ?? 0) * dt;
       b.y += b.vy * dt;
-      if (b.y < -20 || b.y > CANVAS_HEIGHT + 20) b.active = false;
+      if (
+        b.fromPlayer &&
+        !b.spread &&
+        b.y < SINGLE_BULLET_TOP_EXIT_Y
+      ) {
+        b.active = false;
+      } else if (b.y < -20 || b.y > CANVAS_HEIGHT + 20) {
+        b.active = false;
+      }
 
       if (b.fromPlayer) {
         const hit = checkPlayerBulletHits(b, this.aliens, this.shields, this.ufo, this.boss);
@@ -480,7 +491,10 @@ export class Game {
           const killTokens = 1 + (this.meta.upgrades.includes("tokenMagnet") ? 1 : 0);
           this.grantTokens(killTokens);
           this.addScore(ALIEN_POINTS[hit.alien.type] ?? 10);
-          this.particles.burst(hit.alien.x + 14, hit.alien.y + 11, "#00f0ff", 10);
+          this.particles.burst(hit.alien.x + 14, hit.alien.y + 11, "#00f0ff", 14);
+          if (killTokens > 0) {
+            this.particles.burst(hit.alien.x + 14, hit.alien.y + 4, "#ffd24a", 4 + killTokens);
+          }
           this.audio.play("explosion");
           this.registerComboKill();
           this.maybeDropPowerUp(hit.alien.x, hit.alien.y);
@@ -502,9 +516,7 @@ export class Game {
       }
     }
     this.bullets = this.bullets.filter((b) => b.active);
-    if (!this.bullets.some((b) => b.fromPlayer && b.active && !b.spread)) {
-      this.canFire = true;
-    }
+    this.canFire = !playerBulletBlocksSlot(this.bullets);
   }
 
   private updateAliens(dt: number): void {
@@ -513,9 +525,10 @@ export class Game {
 
     const speedMult = this.levelDirector.speedMult(this.difficulty);
     const slow = this.slowTimer > 0 ? 0.4 : 1;
+    const levelPace = 1 + Math.min(0.14, (this.levelDirector.level - 1) * 0.018);
     const tick = Math.max(
       MIN_ALIEN_TICK,
-      (BASE_ALIEN_TICK - (55 - alive.length) * 0.008) / speedMult / slow
+      (BASE_ALIEN_TICK - (55 - alive.length) * 0.008) / speedMult / slow / levelPace
     );
 
     this.alienTickTimer += dt;
@@ -595,7 +608,7 @@ export class Game {
       };
       if (this.ufo.x < 0) this.ufo.direction = 1;
       else this.ufo.direction = -1;
-      this.ufoTimer = 12 + Math.random() * 10;
+      this.ufoTimer = 8 + Math.random() * 7;
       this.audio.play("ufo");
     }
     if (this.ufo?.active) {

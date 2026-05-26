@@ -54,14 +54,16 @@ export const BASE_ALIEN_H_STEP = 8;
 export const BASE_ALIEN_TICK = 0.55;
 export const MIN_ALIEN_TICK = 0.12;
 /** Minimum gap between multi-volley / power-up shots (seconds). */
-export const PLAYER_FIRE_COOLDOWN = 0.3;
+export const PLAYER_FIRE_COOLDOWN = 0.26;
 /** Rapid / plasma pulse interval (seconds). */
 export const RAPID_FIRE_COOLDOWN = 0.085;
 /** Nova plasma volley interval (seconds). */
 export const PLASMA_FIRE_COOLDOWN = 0.14;
-/** Debounce for classic single-shot (slot is gated by canFire). */
-export const SINGLE_FIRE_DEBOUNCE = 0.06;
-export const COMBO_WINDOW = 2;
+/** Cooldown after a solo-cannon shot once the bullet slot is open (seconds). */
+export const SINGLE_FIRE_COOLDOWN = 0.08;
+/** Y threshold — solo bullets despawn here (top exit) so hold-to-fire can refire sooner. */
+export const SINGLE_BULLET_TOP_EXIT_Y = 40;
+export const COMBO_WINDOW = 2.35;
 export const COMBO_MAX = 8;
 export const POWERUP_DURATION = 8;
 export const SLOW_DURATION = 3;
