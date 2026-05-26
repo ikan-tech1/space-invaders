@@ -221,10 +221,16 @@ export function createArmoryScreen(onBack: () => void): Screen {
           const pct = Math.round(Math.abs(d) * 100);
           return `<span class="compare-chip compare-chip--${good ? "good" : "bad"}">${d > 0 ? "+" : "−"}${pct}%</span>`;
         };
-        const statChip = (label: string, eq: string, pv: string, delta = "") =>
-          `<span class="armory-stat-chip"><span class="armory-stat-chip-label">${label}</span><span class="armory-stat-chip-eq">${eq}</span><span class="armory-stat-chip-arrow">→</span><span class="armory-stat-chip-pv">${pv}</span>${delta}</span>`;
+        const statChip = (label: string, eq: string, pv: string, delta = "", improved = false) =>
+          `<span class="armory-stat-chip ${improved ? "armory-stat-chip--improved" : ""} ${delta.includes("compare-chip--good") ? "armory-stat-chip--buff" : delta.includes("compare-chip--bad") ? "armory-stat-chip--nerf" : ""}">
+            <span class="armory-stat-chip-label">${label}</span>
+            <span class="armory-stat-chip-eq">${eq}</span>
+            <span class="armory-stat-chip-arrow">→</span>
+            <span class="armory-stat-chip-pv">${pv}</span>${delta}
+          </span>`;
+        const hasPreviewDelta = previewShip !== equippedShip || previewGun !== equippedGun;
         return `
-          <section class="panel cabinet-panel armory-compare" data-compare-panel>
+          <section class="panel cabinet-panel armory-compare ${hasPreviewDelta ? "armory-compare--active" : ""}" data-compare-panel>
             <h2 class="panel-label">Loadout compare</h2>
             <div class="armory-compare-chips">
               <div class="armory-compare-chip armory-compare-chip--equipped">
@@ -232,8 +238,8 @@ export function createArmoryScreen(onBack: () => void): Screen {
                 <strong>${eqShip.name}</strong>
                 <span class="armory-compare-gun">${GUN_VOLLEY_LABELS[equippedGun]}</span>
               </div>
-              <span class="armory-compare-vs">vs</span>
-              <div class="armory-compare-chip armory-compare-chip--preview">
+              <span class="armory-compare-vs" aria-hidden="true">⇄</span>
+              <div class="armory-compare-chip armory-compare-chip--preview ${hasPreviewDelta ? "armory-compare-chip--highlight" : ""}">
                 <span class="armory-compare-tag">Preview</span>
                 <strong>${pvShip.name}</strong>
                 <span class="armory-compare-gun">${GUN_VOLLEY_LABELS[previewGun]}</span>

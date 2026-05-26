@@ -63,21 +63,24 @@
           <canvas id="game-canvas"></canvas>
         </div>
         <div id="hud">
-          <div class="hud-cabinet">
-            <div class="hud-row">
-              <div class="hud-stat">
-                <span class="hud-label">Score</span>
-                <span id="hud-score" class="hud-value hud-value--gold">0</span>
-              </div>
-              <div class="hud-stat hud-stat--center">
-                <span class="hud-label">Level</span>
-                <span id="hud-wave" class="hud-value hud-value--cyan">1</span>
-              </div>
-              <div class="hud-stat hud-stat--right">
-                <span class="hud-label">Lives</span>
-                <span id="hud-lives" class="hud-value hud-value--danger">♥♥♥</span>
+          <div class="hud-stack">
+            <div class="hud-cabinet">
+              <div class="hud-row">
+                <div class="hud-stat">
+                  <span class="hud-label">Score</span>
+                  <span id="hud-score" class="hud-value hud-value--gold">0</span>
+                </div>
+                <div class="hud-stat hud-stat--center">
+                  <span class="hud-label">Level</span>
+                  <span id="hud-wave" class="hud-value hud-value--cyan">1</span>
+                </div>
+                <div class="hud-stat hud-stat--right">
+                  <span class="hud-label">Lives</span>
+                  <span id="hud-lives" class="hud-value hud-value--danger">♥♥♥</span>
+                </div>
               </div>
             </div>
+            <div id="hud-buffs" class="hud-buff-row hud-buffs hidden" aria-label="Active buffs"></div>
           </div>
           <div class="hud-loadout">
             <div class="hud-meta">
@@ -100,26 +103,31 @@
           <div id="hud-endless-mult" class="hud-endless hidden">×1.0 ENDLESS</div>
           <div id="hud-boss-weak" class="hud-boss-weak hidden">◎ WEAK POINT</div>
           <div id="hud-combo" class="hud-combo hidden">COMBO x1</div>
-          <div id="hud-buffs" class="hud-buffs hidden" aria-label="Active buffs"></div>
         </div>
         <div id="wave-banner" class="wave-banner hidden"></div>
         <div id="sector-briefing-modal" class="hidden level-complete-overlay"></div>
         <div id="level-complete-modal" class="hidden level-complete-overlay"></div>
         <div id="slot-machine-overlay" class="hidden slot-machine-overlay"></div>
-        <div id="pause-overlay" class="hidden">
-          <div class="pause-cabinet">
-            <div class="pause-cabinet-frame" aria-hidden="true">
+        <div id="pause-overlay" class="hidden modal-overlay modal-overlay--game">
+          <div class="pause-cabinet arcade-cabinet arcade-cabinet--modal pause-shell">
+            <div class="arcade-frame pause-cabinet-frame" aria-hidden="true">
               <span class="arcade-corner arcade-corner-tl"></span>
               <span class="arcade-corner arcade-corner-tr"></span>
               <span class="arcade-corner arcade-corner-bl"></span>
               <span class="arcade-corner arcade-corner-br"></span>
               <span class="arcade-scanlines"></span>
+              <span class="arcade-glow"></span>
             </div>
-            <p class="pause-title">PAUSED</p>
-            <div class="screen-marquee pause-marquee" aria-hidden="true">
-              <span>INSERT COIN TO RESUME</span>
+            <div class="pause-body">
+              <p class="cabinet-mini-status pause-status">
+                <span class="arcade-status-dot"></span> CABINET PAUSED
+              </p>
+              <p class="pause-title">PAUSED</p>
+              <div class="screen-marquee pause-marquee" aria-hidden="true">
+                <span>INSERT COIN TO RESUME</span>
+              </div>
             </div>
-            <footer class="pause-footer">
+            <footer class="pause-footer cabinet-footer">
               <button type="button" class="btn btn-primary btn-deploy" id="pause-resume">
                 <span class="btn-deploy-label">Resume</span>
                 <span class="btn-deploy-sub">Continue mission</span>
@@ -140,8 +148,16 @@
         <p id="keyboard-hint">← → move · SPACE fire · P pause</p>
       </div>
     </div>
-    <div id="splash-overlay" class="splash-overlay hidden" role="dialog" aria-label="Loading">
-      <div class="splash-cabinet arcade-cabinet">
+    <div id="splash-overlay" class="splash-overlay modal-overlay hidden" role="dialog" aria-label="Loading">
+      <div class="splash-cabinet arcade-cabinet arcade-cabinet--modal">
+        <div class="arcade-frame" aria-hidden="true">
+          <span class="arcade-corner arcade-corner-tl"></span>
+          <span class="arcade-corner arcade-corner-tr"></span>
+          <span class="arcade-corner arcade-corner-bl"></span>
+          <span class="arcade-corner arcade-corner-br"></span>
+          <span class="arcade-scanlines"></span>
+          <span class="arcade-glow"></span>
+        </div>
         <p class="splash-eyebrow"><span class="arcade-status-dot"></span> ARCADE BOOT</p>
         <h1 class="splash-title">SPACE <span class="splash-og">INVADERS</span></h1>
         <p class="splash-tagline">Original cabinet · deep space link</p>

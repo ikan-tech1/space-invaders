@@ -90,12 +90,13 @@ export class MenuScreen implements Screen {
               <span>1 CREDIT · INSERT COIN</span>
             </div>
             <div class="menu-cabinet-meta">
-              <div class="menu-stat-ring" aria-label="Challenge progress ${badgeCount} of ${challengeTotal}">
+              <div class="menu-stat-ring menu-stat-ring--intro" aria-label="Challenge progress ${badgeCount} of ${challengeTotal}">
                 <svg viewBox="0 0 64 64" class="menu-stat-ring-svg" aria-hidden="true">
                   <circle class="menu-stat-ring-track" cx="32" cy="32" r="28" fill="none" stroke-width="4"/>
                   <circle class="menu-stat-ring-fill" cx="32" cy="32" r="28" fill="none" stroke-width="4"
                     stroke-dasharray="${(2 * Math.PI * 28).toFixed(1)}"
-                    stroke-dashoffset="${(2 * Math.PI * 28 * (1 - badgeCount / Math.max(challengeTotal, 1))).toFixed(1)}"/>
+                    stroke-dashoffset="${(2 * Math.PI * 28 * (1 - badgeCount / Math.max(challengeTotal, 1))).toFixed(1)}"
+                    style="--ring-offset: ${(2 * Math.PI * 28 * (1 - badgeCount / Math.max(challengeTotal, 1))).toFixed(1)}"/>
                 </svg>
                 <span class="menu-stat-ring-value">${Math.round((badgeCount / Math.max(challengeTotal, 1)) * 100)}%</span>
                 <span class="menu-stat-ring-label">Badges</span>
@@ -297,6 +298,11 @@ export class MenuScreen implements Screen {
     window.addEventListener("keydown", onKey);
     (root as HTMLElement & { _konamiCleanup?: () => void })._konamiCleanup = () =>
       window.removeEventListener("keydown", onKey);
+
+    requestAnimationFrame(() => {
+      root.querySelector(".menu-stat-ring--intro")?.classList.remove("menu-stat-ring--intro");
+      root.querySelector(".menu-stat-ring")?.classList.add("menu-stat-ring--ready");
+    });
   }
 
   unmount(): void {

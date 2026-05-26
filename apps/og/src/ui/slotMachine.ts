@@ -114,11 +114,38 @@ function reelStrip(final: ReelSymbol, filler: ReelSymbol[]): ReelSymbol[] {
   return strip;
 }
 
+const SLOT_PIXEL_SYMBOLS: Partial<Record<ReelSymbol, string>> = {
+  life: "1UP",
+  miss: "X",
+  shield: "SHD",
+  tokens: "TOK",
+  secondWind: "WND",
+  rapid: "RPD",
+  spread: "SPR",
+  twin: "TWN",
+  triple: "TRI",
+  quint: "QNT",
+  plasma: "PLS",
+  volleyUp: "VOL",
+  fireRate: "FR",
+  scatter: "SCT",
+  homing: "HMG",
+  comboAura: "CMB",
+  tokenBurst: "BRS",
+  hyperSpeed: "SPD",
+  clone: "CLN",
+  bunker: "BNK",
+  slow: "SLW",
+  invulnPulse: "INV",
+  aegis: "AEG",
+  curseSolo: "CRS",
+  curseSlowFire: "JAM",
+  curseJam: "JAM",
+};
+
 function symbolLabel(sym: ReelSymbol): string {
-  if (sym === "shield") return "◆";
-  if (sym === "tokens") return "◎";
-  if (sym === "secondWind") return "☼";
-  return SLOT_SYMBOLS[sym as keyof typeof SLOT_SYMBOLS] ?? sym;
+  if (sym in SLOT_PIXEL_SYMBOLS) return SLOT_PIXEL_SYMBOLS[sym as ReelSymbol]!;
+  return SLOT_SYMBOLS[sym as keyof typeof SLOT_SYMBOLS] ?? sym.slice(0, 3).toUpperCase();
 }
 
 function symbolClass(sym: ReelSymbol): string {

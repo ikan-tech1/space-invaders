@@ -90,7 +90,7 @@ export function showSectorBriefingModal(
 
   root.classList.remove("hidden");
   root.innerHTML = `
-    <div class="sector-briefing-panel sector-briefing-panel--intro arcade-cabinet arcade-cabinet--modal">
+    <div class="sector-briefing-panel sector-briefing-panel--intro sb-shell arcade-cabinet arcade-cabinet--modal">
       <div class="arcade-frame" aria-hidden="true">
         <span class="arcade-corner arcade-corner-tl"></span>
         <span class="arcade-corner arcade-corner-tr"></span>
@@ -124,6 +124,7 @@ export function showSectorBriefingModal(
         </div>
       </header>
 
+      <div class="sb-scroll">
       <div class="sector-briefing-scanband" aria-hidden="true">
         <div class="sb-radar">
           <span class="sb-radar-ring sb-radar-ring--outer"></span>
@@ -145,8 +146,12 @@ export function showSectorBriefingModal(
           <p>${briefing.tip}</p>
         </aside>
       </div>
+      </div>
 
-      <footer class="sector-briefing-footer">
+      <footer class="sector-briefing-footer sb-footer cabinet-footer">
+        <div class="screen-marquee sb-marquee" aria-hidden="true">
+          <span>SECTOR ${sectorRoman(briefing.sector)} · LV ${briefing.level}</span>
+        </div>
         <button type="button" class="btn btn-primary btn-deploy sector-briefing-go" aria-describedby="sector-briefing-deploy-hint">
           <span class="btn-deploy-label">Deploy</span>
           <span class="btn-deploy-sub">Engage hostiles</span>
