@@ -105,6 +105,62 @@ export function getDailyDateKey(): string {
   return dateKey();
 }
 
+const DAILY_TARGETS: Record<string, number> = {
+  daily_kills_30: 30,
+  daily_kills_15: 15,
+  daily_tokens_20: 20,
+  daily_combo_6: 6,
+  daily_combo_4: 4,
+  daily_boss: 1,
+  daily_flawless: 1,
+  daily_levels_3: 3,
+};
+
+function dailyCurrentForTask(id: string, stats: DailyRunStats): number {
+  switch (id) {
+    case "daily_kills_30":
+    case "daily_kills_15":
+      return stats.killsThisRun;
+    case "daily_tokens_20":
+      return stats.runTokensEarned;
+    case "daily_combo_6":
+    case "daily_combo_4":
+      return stats.maxCombo;
+    case "daily_boss":
+      return stats.bossDefeated ? 1 : 0;
+    case "daily_flawless":
+      return stats.flawlessLevel ? 1 : 0;
+    case "daily_levels_3":
+      return stats.levelsCleared;
+    default:
+      return 0;
+  }
+}
+
+export interface DailyTaskProgress {
+  current: number;
+  target: number;
+  done: boolean;
+  pct: number;
+}
+
+/** Live progress toward a daily task from current run stats. */
+export function getDailyTaskProgress(task: DailyChallengeDef, stats: DailyRunStats): DailyTaskProgress {
+  const target = DAILY_TARGETS[task.id] ?? 1;
+  const current = Math.min(dailyCurrentForTask(task.id, stats), target);
+  const done = task.check(stats);
+  const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : done ? 100 : 0;
+  return { current, target, done, pct };
+}
+
+/** Progress for all of today's daily ops tasks. */
+export function getDailyProgress(stats: DailyRunStats, forDate = new Date()): Array<DailyChallengeDef & DailyTaskProgress> {
+  return getDailyTasks(forDate).map((task) => ({
+    ...task,
+    ...getDailyTaskProgress(task, stats),
+  }));
+}
+
 export function loadDailyCompletedDate(): string | null {
   return localStorage.getItem("og_daily_completed");
 }

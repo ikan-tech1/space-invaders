@@ -11,6 +11,7 @@ import { getSectorBriefing } from "../progression/sectorBriefings";
 import { showSlotMachine } from "../ui/slotMachine";
 import { ARCADE_FRAME, styleWaveBanner } from "../ui/cabinetShell";
 import { trapFocus, type FocusTrapHandle } from "../ui/focusTrap";
+import { renderPauseMissionControl } from "../ui/pauseMissionControl";
 
 export interface GameScreenDeps {
   repo: LocalStorageRepo;
@@ -34,6 +35,7 @@ export class GameScreen {
   private slotOverlay: HTMLElement;
   private briefingModal: HTMLElement;
   private pauseFocusTrap: FocusTrapHandle | null = null;
+  private pauseKeyHandler: ((e: KeyboardEvent) => void) | null = null;
 
   constructor(private deps: GameScreenDeps) {
     this.canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
@@ -158,8 +160,18 @@ export class GameScreen {
       onToast: showToast,
       onPauseChange: (paused) => {
         pauseOverlay.classList.toggle("hidden", !paused);
-        if (paused) {
-          const shell = pauseOverlay.querySelector<HTMLElement>(".pause-cabinet");
+        if (paused && this.game) {
+          renderPauseMissionControl(pauseOverlay, this.game, {
+            onResume: () => {
+              if (this.game?.state === "paused") this.game.togglePause();
+            },
+            onExitToMenu: () => {
+              this.stop();
+              this.deps.repo.clearSavedRun();
+              this.deps.onExitToMenu();
+            },
+          });
+          const shell = pauseOverlay.querySelector<HTMLElement>(".pause-mission-control");
           const resumeBtn = document.getElementById("pause-resume");
           pauseOverlay.setAttribute("role", "dialog");
           pauseOverlay.setAttribute("aria-modal", "true");
@@ -170,9 +182,26 @@ export class GameScreen {
               initial: resumeBtn,
             });
           }
+          this.pauseKeyHandler = (e: KeyboardEvent) => {
+            if (e.key === "Escape" && this.game?.state === "paused") {
+              e.preventDefault();
+              const confirm = pauseOverlay.querySelector("#pause-abandon-confirm");
+              if (confirm && !confirm.classList.contains("hidden")) {
+                confirm.classList.add("hidden");
+                document.getElementById("pause-main-menu")?.focus();
+              } else {
+                this.game.togglePause();
+              }
+            }
+          };
+          window.addEventListener("keydown", this.pauseKeyHandler);
         } else {
           this.pauseFocusTrap?.release();
           this.pauseFocusTrap = null;
+          if (this.pauseKeyHandler) {
+            window.removeEventListener("keydown", this.pauseKeyHandler);
+            this.pauseKeyHandler = null;
+          }
         }
       },
       onCampaignClear: () => {
@@ -290,10 +319,6 @@ export class GameScreen {
       }
     }, 5000);
 
-    document.getElementById("pause-resume")?.addEventListener("click", () => {
-      if (this.game?.state === "paused") this.game.togglePause();
-    });
-
     window.addEventListener("resize", this.onResize);
     this.audio.resume();
   }
@@ -348,6 +373,10 @@ export class GameScreen {
   stop(): void {
     this.pauseFocusTrap?.release();
     this.pauseFocusTrap = null;
+    if (this.pauseKeyHandler) {
+      window.removeEventListener("keydown", this.pauseKeyHandler);
+      this.pauseKeyHandler = null;
+    }
     this.loop?.stop();
     this.loop = null;
     this.input?.destroy();

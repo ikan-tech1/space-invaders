@@ -2057,4 +2057,36 @@ export class Game {
       difficulty: this.difficulty,
     };
   }
+
+  /** Snapshot for Mission Control pause overlay. */
+  getPauseSnapshot() {
+    const dailyStats: DailyRunStats = {
+      killsThisRun: this.runKills,
+      runTokensEarned: this.runTokensEarned,
+      maxCombo: this.runMaxCombo,
+      bossDefeated: this.runBossDefeated,
+      flawlessLevel: this.runFlawlessLevel,
+      levelsCleared: this.runLevelsCleared,
+    };
+    return {
+      level: this.levelDirector.level,
+      score: this.score,
+      lives: this.lives,
+      gameMode: this.gameMode,
+      shipLabel: this.getShipLabel(),
+      gunLabel: this.getGunLabel(),
+      runTokensEarned: this.runTokensEarned,
+      runTokenPool: this.runTokenPool,
+      comboMult: this.comboMult,
+      comboCount: this.comboCount,
+      runMaxCombo: this.runMaxCombo,
+      runKills: this.runKills,
+      equippedShip: this.meta.equippedShip,
+      unlockedGunCount: this.meta.unlockedGuns.length,
+      totalTokensSpent: this.meta.totalTokensSpent,
+      maxComboThisLevel: this.challenges.maxComboThisLevel,
+      badges: [...this.meta.badges],
+      dailyStats,
+    };
+  }
 }
