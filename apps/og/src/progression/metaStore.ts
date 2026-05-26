@@ -1,4 +1,5 @@
 import type { ArmoryGunId } from "./armoryGuns";
+import { CAMPAIGN_MAX_LEVEL } from "./levelScript";
 import type { ShipId } from "./ships";
 
 export type OgMetaUpgrade =
@@ -12,6 +13,10 @@ export type OgMetaUpgrade =
 export interface OgMeta {
   stars: number;
   tokens: number;
+  /** Highest campaign level cleared (1–12). */
+  campaignBestLevel: number;
+  /** Per-level star rating (1–3) keyed by level number. */
+  campaignStars: Record<string, number>;
   endlessUnlocked: boolean;
   campaignCleared: boolean;
   upgrades: OgMetaUpgrade[];
@@ -28,6 +33,8 @@ const KEY = "og_meta";
 const DEFAULT: OgMeta = {
   stars: 0,
   tokens: 0,
+  campaignBestLevel: 0,
+  campaignStars: {},
   endlessUnlocked: false,
   campaignCleared: false,
   upgrades: [],
@@ -69,6 +76,10 @@ function migrateMeta(m: OgMeta): OgMeta {
   if (!m.unlockedGuns.includes(m.equippedGun)) {
     m.equippedGun = "single";
   }
+  if (typeof m.campaignBestLevel !== "number" || m.campaignBestLevel < 0) {
+    m.campaignBestLevel = m.campaignCleared ? CAMPAIGN_MAX_LEVEL : 0;
+  }
+  if (!m.campaignStars) m.campaignStars = {};
   return m;
 }
 

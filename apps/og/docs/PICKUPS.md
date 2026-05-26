@@ -73,6 +73,28 @@ Weights are per-pickup `weight` in `PICKUP_DEFS` (see `config.ts`). Armory-unloc
 
 Toast on pickup: `name — duration` via `pickupToastLine()`. HUD `#hud-buffs` shows active timed buffs and until-life-lost aegis/combo.
 
+### Collection feedback
+
+- Pickups within ~78px of the ship are magnet-pulled with cyan/category spark trails.
+- On collect, a streak of particles runs from the pickup to the ship plus a local burst.
+
+### SFX
+
+| Trigger | Sound |
+|---------|-------|
+| Common / weapon pickup | `powerup` (523→784 Hz) |
+| Curse pickup | `pickupCurse` (low saw) |
+| Economy / tokenBurst | `pickupEconomy` (coin arpeggio) |
+| Rare rarity | `pickupRare` (ascending sine) |
+
+### Campaign map
+
+`campaignBestLevel` in meta tracks highest cleared stage. Sector select unlocks levels 1 through `best + 1`. Campaign button opens the 4×3 sector grid before launch.
+
+### Achievements
+
+New challenge badges queue `og_pending_achievement_toasts` and replay as gold achievement toasts when returning to the main menu.
+
 ## Slot machine
 
 Last-life reels use the same `PowerUpType` symbols; pool = `getAvailablePowerups()` (gated like field drops). Filler reels include volleyUp, fireRate, scatter, homing, comboAura, tokenBurst, hyperSpeed, invulnPulse.

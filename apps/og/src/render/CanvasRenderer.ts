@@ -229,14 +229,50 @@ export class CanvasRenderer {
     ctx.fillStyle = COLORS.gold;
     ctx.fillRect(x - 50, y - (mini ? 36 : 48), 100 * hpPct, 8);
 
+    const wpX = x + (boss.weakPoint === 0 ? -25 : boss.weakPoint === 1 ? 0 : 25);
+    const wpY = y + 8;
+    const wpPulse = 0.45 + Math.sin(Date.now() / 140) * 0.35;
+    const wpRadius = mini ? 10 : 13;
+
+    ctx.save();
+    ctx.strokeStyle = `rgba(0, 240, 255, ${0.35 + wpPulse * 0.45})`;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.arc(wpX, wpY, wpRadius + 6 + wpPulse * 4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.strokeStyle = `rgba(255, 210, 74, ${0.5 + wpPulse * 0.4})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(wpX - wpRadius - 4, wpY);
+    ctx.lineTo(wpX + wpRadius + 4, wpY);
+    ctx.moveTo(wpX, wpY - wpRadius - 4);
+    ctx.lineTo(wpX, wpY + wpRadius + 4);
+    ctx.stroke();
+
+    ctx.fillStyle = `rgba(255, 68, 102, ${0.25 + wpPulse * 0.35})`;
+    ctx.beginPath();
+    ctx.moveTo(wpX, wpY - wpRadius - 10);
+    ctx.lineTo(wpX - 5, wpY - wpRadius - 2);
+    ctx.lineTo(wpX + 5, wpY - wpRadius - 2);
+    ctx.closePath();
+    ctx.fill();
+
     ctx.fillStyle = COLORS.accent;
     ctx.shadowColor = COLORS.accent;
-    ctx.shadowBlur = 10;
-    const wpX = x + (boss.weakPoint === 0 ? -25 : boss.weakPoint === 1 ? 0 : 25);
+    ctx.shadowBlur = 12 + wpPulse * 8;
     ctx.beginPath();
-    ctx.arc(wpX, y + 8, mini ? 6 : 8, 0, Math.PI * 2);
+    ctx.arc(wpX, wpY, mini ? 6 : 8, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
+
+    ctx.font = "bold 8px monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = `rgba(0, 240, 255, ${0.7 + wpPulse * 0.3})`;
+    ctx.fillText("WEAK", wpX, wpY + wpRadius + 14);
+    ctx.restore();
   }
 
   drawPowerUp(p: PowerUpDrop): void {

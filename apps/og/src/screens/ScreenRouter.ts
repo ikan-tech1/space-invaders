@@ -1,5 +1,6 @@
 export type ScreenId =
   | "menu"
+  | "sectorMap"
   | "game"
   | "gameOver"
   | "settings"

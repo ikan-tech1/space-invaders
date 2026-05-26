@@ -12,6 +12,9 @@ export type SfxType =
   | "bossDefeat"
   | "miniBossSpawn"
   | "playerHit"
+  | "pickupCurse"
+  | "pickupEconomy"
+  | "pickupRare"
   | "slotSpin"
   | "slotWin"
   | "slotReelStop"
@@ -158,6 +161,20 @@ export class AudioManager {
         break;
       case "playerHit":
         b(150, 0.25, "sawtooth", 0.12);
+        break;
+      case "pickupCurse":
+        b(90, 0.12, "sawtooth", 0.1);
+        b(70, 0.18, "square", 0.08);
+        break;
+      case "pickupEconomy":
+        b(880, 0.06, "sine", 0.09);
+        b(1175, 0.1, "sine", 0.08);
+        b(1480, 0.12, "sine", 0.06);
+        break;
+      case "pickupRare":
+        b(660, 0.08, "sine", 0.1);
+        b(880, 0.1, "sine", 0.09);
+        b(1046, 0.14, "sine", 0.08);
         break;
       case "slotSpin":
         this.beep(320, 0.05, "square", 0.06, "ui");

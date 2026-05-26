@@ -35,6 +35,39 @@ export class ParticleSystem {
     }
   }
 
+  magnetSpark(x: number, y: number, color: string): void {
+    if (this.reducedMotion) return;
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 20 + Math.random() * 40;
+    this.particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 30,
+      life: 0.15 + Math.random() * 0.2,
+      maxLife: 0.35,
+      color,
+      size: 1.5 + Math.random() * 2,
+    });
+  }
+
+  collectTrail(fromX: number, fromY: number, toX: number, toY: number, color: string): void {
+    const steps = this.reducedMotion ? 4 : 8;
+    for (let i = 0; i < steps; i++) {
+      const t = (i + Math.random() * 0.4) / steps;
+      this.particles.push({
+        x: fromX + (toX - fromX) * t,
+        y: fromY + (toY - fromY) * t,
+        vx: (Math.random() - 0.5) * 40,
+        vy: -60 - Math.random() * 40,
+        life: 0.25 + Math.random() * 0.25,
+        maxLife: 0.5,
+        color,
+        size: 2 + Math.random() * 2,
+      });
+    }
+  }
+
   update(dt: number): void {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i]!;

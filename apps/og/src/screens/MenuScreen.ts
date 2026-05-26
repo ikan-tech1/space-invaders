@@ -1,7 +1,13 @@
 import type { Difficulty, GameMode } from "../config";
 import { OG_CHALLENGES } from "../progression/challenges";
+import {
+  getDailyChallenge,
+  getDailyDateKey,
+  loadDailyCompletedDate,
+} from "../progression/dailyChallenges";
 import { EasterEggRegistry } from "../progression/easterEggs";
 import { loadOgMeta, saveOgMeta } from "../progression/metaStore";
+import { drainPendingToasts } from "../progression/pendingToasts";
 import { SHIP_PROFILES } from "../progression/ships";
 import type { LocalStorageRepo } from "../storage/LocalStorageRepo";
 import type { Screen } from "./ScreenRouter";
@@ -12,6 +18,7 @@ export interface MenuScreenDeps {
   onDifficultyChange: (d: Difficulty) => void;
   onPlay: (continueRun: boolean, mode: GameMode) => void;
   onNavigate: (screen: "settings" | "highScores" | "howToPlay" | "challenges" | "armory") => void;
+  onCampaign: () => void;
 }
 
 const DIFF_LABELS: Record<Difficulty, string> = {
@@ -32,6 +39,8 @@ export class MenuScreen implements Screen {
     const meta = loadOgMeta();
     const badgeCount = meta.badges.length;
     const challengeTotal = OG_CHALLENGES.length;
+    const daily = getDailyChallenge();
+    const dailyDone = loadDailyCompletedDate() === getDailyDateKey();
 
     root.innerHTML = `
       <div class="screen menu-screen">
@@ -198,6 +207,11 @@ export class MenuScreen implements Screen {
         </section>
 
         <nav class="menu-nav-grid" aria-label="Arcade menu">
+          <button type="button" class="nav-tile nav-tile-daily ${dailyDone ? "nav-tile-daily--done" : ""}" data-action="daily">
+            <span class="nav-tile-icon">☀</span>
+            <span class="nav-tile-label">Daily</span>
+            <span class="nav-tile-meta">${dailyDone ? "Done" : `+${daily.tokenReward} ◎`}</span>
+          </button>
           <button type="button" class="nav-tile" data-action="armory">
             <span class="nav-tile-icon">⚔</span>
             <span class="nav-tile-label">Armory</span>
@@ -232,8 +246,7 @@ export class MenuScreen implements Screen {
     `;
 
     root.querySelector('[data-action="campaign"]')?.addEventListener("click", () => {
-      this.deps.repo.clearSavedRun();
-      this.deps.onPlay(false, "campaign");
+      this.deps.onCampaign();
     });
     root.querySelector('[data-action="endless"]')?.addEventListener("click", () => {
       this.deps.repo.clearSavedRun();
@@ -241,6 +254,9 @@ export class MenuScreen implements Screen {
     });
     root.querySelector('[data-action="continue"]')?.addEventListener("click", () => {
       this.deps.onPlay(true, "campaign");
+    });
+    root.querySelector('[data-action="daily"]')?.addEventListener("click", () => {
+      this.deps.onNavigate("challenges");
     });
     root.querySelector('[data-action="armory"]')?.addEventListener("click", () => {
       this.deps.onNavigate("armory");
@@ -269,7 +285,7 @@ export class MenuScreen implements Screen {
     });
 
     let toastTimer: ReturnType<typeof setTimeout> | null = null;
-    const showMenuToast = (text: string): void => {
+    const showMenuToast = (text: string, achievement = false): void => {
       let el = root.querySelector(".menu-secret-toast") as HTMLElement | null;
       if (!el) {
         el = document.createElement("p");
@@ -277,10 +293,21 @@ export class MenuScreen implements Screen {
         root.querySelector(".menu-screen")?.appendChild(el);
       }
       el.textContent = text;
+      el.classList.toggle("menu-secret-toast--achievement", achievement);
       el.classList.add("menu-secret-toast--visible");
       if (toastTimer) clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => el?.classList.remove("menu-secret-toast--visible"), 3200);
+      toastTimer = setTimeout(() => {
+        el?.classList.remove("menu-secret-toast--visible");
+        el?.classList.remove("menu-secret-toast--achievement");
+      }, achievement ? 4200 : 3200);
     };
+
+    const pending = drainPendingToasts();
+    if (pending.length) {
+      pending.forEach((msg: string, i: number) => {
+        window.setTimeout(() => showMenuToast(msg, true), 400 + i * 900);
+      });
+    }
 
     const onKey = (e: KeyboardEvent) => {
       const reward = this.eggs.onMenuKey(e.key);

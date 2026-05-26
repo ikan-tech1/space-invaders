@@ -15,6 +15,7 @@ export interface GameScreenDeps {
   difficulty: Difficulty;
   gameMode: GameMode;
   continueRun: boolean;
+  startLevel?: number;
   onGameOver: (score: number, wave: number) => void;
   onExitToMenu: () => void;
 }
@@ -219,7 +220,12 @@ export class GameScreen {
     });
 
     this.game.particles.setReducedMotion(reducedMotion);
-    this.game.init(this.deps.difficulty, this.deps.gameMode, continueData);
+    this.game.init(
+      this.deps.difficulty,
+      this.deps.gameMode,
+      continueData,
+      this.deps.continueRun ? undefined : this.deps.startLevel
+    );
     if (continueData) this.deps.repo.clearSavedRun();
     hudGun.textContent = this.game.getGunLabel();
     hudShip.textContent = this.game.getShipLabel();

@@ -14,6 +14,7 @@ import {
   createSettingsScreen,
 } from "./screens/SubScreens";
 import { showSplashIfNeeded } from "./ui/splashScreen";
+import { createSectorMapScreen } from "./ui/sectorMapScreen";
 
 initSpaceBackdrop();
 
@@ -42,11 +43,19 @@ function showMenu(): void {
         if (screen === "challenges") router.show(createChallengesScreen(showMenu));
         if (screen === "armory") router.show(createArmoryScreen(showMenu));
       },
+      onCampaign: () => {
+        router.show(
+          createSectorMapScreen(showMenu, (level) => {
+            repo.clearSavedRun();
+            startGame(false, "campaign", level);
+          })
+        );
+      },
     })
   );
 }
 
-function startGame(continueRun: boolean, mode: GameMode): void {
+function startGame(continueRun: boolean, mode: GameMode, startLevel = 1): void {
   setSpaceBackdropMode("game");
   router.clear();
   gameScreen = new GameScreen({
@@ -54,6 +63,7 @@ function startGame(continueRun: boolean, mode: GameMode): void {
     difficulty,
     gameMode: mode,
     continueRun,
+    startLevel: continueRun ? undefined : mode === "campaign" ? startLevel : 1,
     onGameOver: (score, wave) => {
       gameScreen = null;
       setSpaceBackdropMode("menu");

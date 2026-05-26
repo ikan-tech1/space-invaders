@@ -17,6 +17,7 @@ import {
   MAX_PICKUPS_ON_SCREEN,
   MIN_ALIEN_TICK,
   pickupToastLine,
+  PICKUP_CATEGORY_COLORS,
   PLAYER_FIRE_COOLDOWN,
   PLAYER_SPEED,
   PLAYER_Y,
@@ -83,6 +84,7 @@ import {
   saveDailyCompleted,
   type DailyRunStats,
 } from "../progression/dailyChallenges";
+import { queuePendingToast } from "../progression/pendingToasts";
 import type { FormationType } from "../config";
 import {
   getShipProfile,
@@ -227,7 +229,8 @@ export class Game {
   init(
     difficulty: Difficulty,
     mode: GameMode,
-    continueRun?: { score: number; wave: number; lives: number }
+    continueRun?: { score: number; wave: number; lives: number },
+    startLevel?: number
   ): void {
     this.difficulty = difficulty;
     this.gameMode = mode;
@@ -236,7 +239,11 @@ export class Game {
     this.lives = continueRun?.lives ?? cfg.lives;
     if (this.meta.upgrades.includes("extraLife")) this.lives++;
     this.score = continueRun?.score ?? 0;
-    if (continueRun) this.levelDirector.level = continueRun.wave;
+    if (continueRun) {
+      this.levelDirector.level = continueRun.wave;
+    } else if (mode === "campaign" && startLevel && startLevel > 1) {
+      this.levelDirector.level = Math.min(startLevel, CAMPAIGN_MAX_LEVEL);
+    }
     this.challenges = new ChallengeTracker(
       this.meta.badges,
       this.meta.equippedShip,
@@ -970,11 +977,32 @@ export class Game {
     for (const p of this.powerUps) {
       if (!p.active) continue;
       p.y += p.vy * dt;
+
+      const dx = this.playerX - p.x;
+      const dy = this.playerY - p.y;
+      const dist = Math.hypot(dx, dy);
+      const magnetActive =
+        this.meta.upgrades.includes("tokenMagnet") || this.magnetBurstActive;
+      const magnetRange = magnetActive ? 92 : 0;
+      if (magnetRange > 0 && dist < magnetRange && dist > 6) {
+        const pull = (1 - dist / magnetRange) * 300 * dt;
+        p.x += (dx / dist) * pull;
+        p.y += (dy / dist) * pull;
+        if (Math.random() < 0.28) {
+          const color = PICKUP_CATEGORY_COLORS[getPickupDef(p.type).category];
+          this.particles.magnetSpark(p.x, p.y, color);
+        }
+      }
+
       if (p.y > CANVAS_HEIGHT) p.active = false;
       if (
         Math.abs(p.x - this.playerX) < 28 &&
         Math.abs(p.y - this.playerY) < 24
       ) {
+        const def = getPickupDef(p.type);
+        const color = PICKUP_CATEGORY_COLORS[def.category];
+        this.particles.collectTrail(p.x, p.y, this.playerX, this.playerY, color);
+        this.particles.burst(this.playerX, this.playerY - 8, color, 12);
         p.active = false;
         this.applyPowerUp(p.type);
       }
@@ -1156,7 +1184,10 @@ export class Game {
   private applyPowerUp(type: PowerUpType): void {
     const def = getPickupDef(type);
     const isCurse = def.category === "curse";
-    this.audio.play(isCurse ? "playerHit" : "powerup");
+    if (isCurse) this.audio.play("pickupCurse");
+    else if (def.category === "economy" || type === "tokenBurst") this.audio.play("pickupEconomy");
+    else if (def.rarity === "rare") this.audio.play("pickupRare");
+    else this.audio.play("powerup");
     this.callbacks.onToast(pickupToastLine(type));
 
     if (type === "shield") {
@@ -1430,7 +1461,9 @@ export class Game {
       const def = OG_CHALLENGES.find((ch) => ch.id === c.id);
       if (def?.starReward) {
         this.meta.stars += def.starReward;
-        this.callbacks.onToast(`${def.title} — +${def.starReward} ★`);
+        const msg = `${def.title} — +${def.starReward} ★`;
+        this.callbacks.onToast(msg);
+        queuePendingToast(`Achievement: ${msg}`);
       }
       if (c.id === "no_hit_l3" && !this.meta.unlockedPickups.includes("plasma")) {
         this.meta.unlockedPickups.push("plasma");
@@ -1451,6 +1484,15 @@ export class Game {
       );
     }
     this.meta.badges = this.challenges.getCompletedIds();
+    if (this.gameMode === "campaign") {
+      this.meta.campaignBestLevel = Math.max(
+        this.meta.campaignBestLevel ?? 0,
+        this.levelDirector.level
+      );
+      const key = String(this.levelDirector.level);
+      const prevStars = this.meta.campaignStars[key] ?? 0;
+      if (stars > prevStars) this.meta.campaignStars[key] = stars;
+    }
     if (this.levelDirector.level === 6) this.meta.endlessUnlocked = true;
     if (this.levelDirector.level >= CAMPAIGN_MAX_LEVEL && this.gameMode === "campaign") {
       this.meta.campaignCleared = true;
