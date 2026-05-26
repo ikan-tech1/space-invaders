@@ -194,7 +194,7 @@ export class GameScreen {
     tip.innerHTML = `
       <p class="onboarding-tip-title">Quick briefing</p>
       <p>Move with <kbd>←</kbd> <kbd>→</kbd> or drag the zone. Tap <strong>FIRE</strong> or press <kbd>Space</kbd>.</p>
-      <p>Chain kills for combos. After a hit, spin <strong>Lucky Reels</strong> for a bonus life or power-up.</p>
+      <p>Chain kills for combos. On your <strong>last life</strong>, <strong>Lucky Reels</strong> offers a last-chance spin.</p>
       <button type="button" class="btn btn-primary onboarding-dismiss">Got it</button>
     `;
     this.gameLayer.appendChild(tip);

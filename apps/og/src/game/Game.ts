@@ -773,14 +773,25 @@ export class Game {
     this.comboCount = 0;
     this.comboMult = 1;
     this.callbacks.onComboChange(0, 1);
+    this.respawnAfterHit();
+
+    if (this.lives > 0) return;
+
     this.state = "slotMachine";
     this.callbacks.onSlotMachine({
       lives: this.lives,
       maxLives: SLOT_MAX_LIVES,
       powerUpPool: this.getAvailablePowerups(),
-      isFinalSpin: this.lives <= 0,
+      isFinalSpin: true,
       luckySlot: this.meta.upgrades.includes("luckySlot"),
     });
+  }
+
+  /** Clear player shots and reset firing so respawn is fair. */
+  private respawnAfterHit(): void {
+    this.bullets = this.bullets.filter((b) => !b.fromPlayer);
+    this.canFire = true;
+    this.fireCooldown = 0;
   }
 
   resolveSlotResult(outcome: SlotOutcome): void {
@@ -796,9 +807,7 @@ export class Game {
     }
 
     this.invulnTimer = INVULN_TIME;
-    this.bullets = this.bullets.filter((b) => !b.fromPlayer);
-    this.canFire = true;
-    this.fireCooldown = 0;
+    this.respawnAfterHit();
 
     if (this.lives <= 0) {
       this.endGame();
