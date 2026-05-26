@@ -9,6 +9,7 @@ import { showLevelCompleteModal } from "../ui/levelCompleteModal";
 import { showSectorBriefingModal } from "../ui/sectorBriefingModal";
 import { getSectorBriefing } from "../progression/sectorBriefings";
 import { showSlotMachine } from "../ui/slotMachine";
+import { styleWaveBanner } from "../ui/cabinetShell";
 
 export interface GameScreenDeps {
   repo: LocalStorageRepo;
@@ -79,6 +80,7 @@ export class GameScreen {
     const hudShip = document.getElementById("hud-ship-name")!;
     const hudTokens = document.getElementById("hud-tokens")!;
     const hudRunPool = document.getElementById("hud-run-pool")!;
+    const hudEndlessWrap = document.getElementById("hud-endless-wrap")!;
     const hudEndlessMult = document.getElementById("hud-endless-mult")!;
     const hudCombo = document.getElementById("hud-combo")!;
     const hudBuffs = document.getElementById("hud-buffs")!;
@@ -88,6 +90,7 @@ export class GameScreen {
 
     const showToast = (text: string): void => {
       waveBanner.textContent = text;
+      styleWaveBanner(waveBanner, text);
       waveBanner.classList.remove("hidden");
       window.setTimeout(() => waveBanner.classList.add("hidden"), 1800);
     };
@@ -118,6 +121,7 @@ export class GameScreen {
       },
       onWaveBanner: (text) => {
         waveBanner.textContent = text;
+        styleWaveBanner(waveBanner, text);
         waveBanner.classList.remove("hidden");
         setTimeout(() => waveBanner.classList.add("hidden"), 1400);
       },
@@ -154,6 +158,7 @@ export class GameScreen {
       },
       onCampaignClear: () => {
         waveBanner.textContent = "CAMPAIGN CLEARED!";
+        styleWaveBanner(waveBanner, "CAMPAIGN CLEARED!");
         waveBanner.classList.remove("hidden");
       },
       onTokensChange: (t) => {
@@ -164,10 +169,10 @@ export class GameScreen {
       },
       onEndlessMultChange: (mult) => {
         if (this.deps.gameMode === "endless" && mult > 1) {
-          hudEndlessMult.classList.remove("hidden");
-          hudEndlessMult.textContent = `×${mult.toFixed(1)} ENDLESS`;
+          hudEndlessWrap.classList.remove("hidden");
+          hudEndlessMult.textContent = `×${mult.toFixed(1)}`;
         } else {
-          hudEndlessMult.classList.add("hidden");
+          hudEndlessWrap.classList.add("hidden");
         }
       },
       onLoadoutChange: (ship, gun) => {
@@ -234,8 +239,8 @@ export class GameScreen {
     if (this.deps.gameMode === "endless") {
       const mult = 1 + Math.min(1.5, (this.game.getSaveData().wave - 1) * 0.08);
       if (mult > 1) {
-        hudEndlessMult.classList.remove("hidden");
-        hudEndlessMult.textContent = `×${mult.toFixed(1)} ENDLESS`;
+        hudEndlessWrap.classList.remove("hidden");
+        hudEndlessMult.textContent = `×${mult.toFixed(1)}`;
       }
     }
 

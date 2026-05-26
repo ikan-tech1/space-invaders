@@ -1,6 +1,11 @@
 import type { GameSettings } from "../storage/LocalStorageRepo";
 import type { LocalStorageRepo } from "../storage/LocalStorageRepo";
 import type { Screen } from "./ScreenRouter";
+import {
+  renderSubBackFooter,
+  renderSubCabinetShell,
+  renderSubHeader,
+} from "../ui/cabinetShell";
 import { OG_CHALLENGES } from "../progression/challenges";
 import {
   getDailyChallenge,
@@ -20,17 +25,6 @@ import { GUN_VOLLEY_LABELS, getGunCompareStats } from "../game/weaponVolley";
 import { POWERUP_LABELS, type PowerUpType } from "../config";
 import { mountArmoryGunPreviews, mountArmoryShipSprites } from "../ui/armoryGunPreview";
 
-function renderSubHeader(title: string, subtitle: string, marquee = "— ARCADE MENU —"): string {
-  return `
-    <header class="sub-header cabinet-mini sub-cabinet">
-      <div class="cabinet-mini-glow" aria-hidden="true"></div>
-      <p class="cabinet-mini-status"><span class="arcade-status-dot"></span> CABINET OS</p>
-      <h1 class="screen-title">${title}</h1>
-      <p class="screen-subtitle">${subtitle}</p>
-      <div class="screen-marquee" aria-hidden="true"><span>${marquee}</span></div>
-    </header>`;
-}
-
 export function createSettingsScreen(
   repo: LocalStorageRepo,
   onBack: () => void
@@ -39,9 +33,9 @@ export function createSettingsScreen(
     id: "settings",
     mount(root) {
       const s = repo.getSettings();
-      root.innerHTML = `
-        <div class="screen sub-screen">
-          ${renderSubHeader("Settings", "Cabinet configuration", "— CONFIG —")}
+      root.innerHTML = renderSubCabinetShell({
+        headerHtml: renderSubHeader("Settings", "Cabinet configuration", "— CONFIG —"),
+        bodyHtml: `
           <section class="panel cabinet-panel">
             <h2 class="panel-label">Audio &amp; Controls</h2>
             <div class="settings-row">
@@ -64,10 +58,9 @@ export function createSettingsScreen(
               <label for="mute">Mute</label>
               <input type="checkbox" id="mute" ${s.muted ? "checked" : ""} />
             </div>
-          </section>
-          <button type="button" class="btn btn-primary" data-back>Main Menu</button>
-        </div>
-      `;
+          </section>`,
+        footerHtml: renderSubBackFooter(),
+      });
       const save = (): void => {
         const settings: GameSettings = {
           volume: parseFloat((root.querySelector("#vol") as HTMLInputElement).value),
@@ -103,15 +96,14 @@ export function createHighScoresScreen(repo: LocalStorageRepo, onBack: () => voi
                   `<li><span class="records-rank">${i + 1}. ${e.initials}</span><span class="records-score">${e.score.toLocaleString()} · L${e.wave}</span></li>`
               )
               .join("");
-      root.innerHTML = `
-        <div class="screen sub-screen">
-          ${renderSubHeader("High Scores", "Hall of fame", "— TOP PLAYERS —")}
+      root.innerHTML = renderSubCabinetShell({
+        headerHtml: renderSubHeader("High Scores", "Hall of fame", "— TOP PLAYERS —"),
+        bodyHtml: `
           <section class="panel cabinet-panel panel-flush">
             <ul class="high-score-list">${rows}</ul>
-          </section>
-          <button type="button" class="btn btn-primary" data-back>Main Menu</button>
-        </div>
-      `;
+          </section>`,
+        footerHtml: renderSubBackFooter(),
+      });
       root.querySelector("[data-back]")?.addEventListener("click", onBack);
     },
     unmount() {},
@@ -122,9 +114,9 @@ export function createHowToPlayScreen(onBack: () => void): Screen {
   return {
     id: "howToPlay",
     mount(root) {
-      root.innerHTML = `
-        <div class="screen sub-screen">
-          ${renderSubHeader("How to Play", "Operator manual", "— READ ME —")}
+      root.innerHTML = renderSubCabinetShell({
+        headerHtml: renderSubHeader("How to Play", "Operator manual", "— READ ME —"),
+        bodyHtml: `
           <section class="panel cabinet-panel how-to-play">
             <h2 class="panel-label">Mission briefing</h2>
             <p><strong>Goal:</strong> Clear 12 campaign levels. Mini bosses every 3 levels, big bosses every 6.</p>
@@ -136,10 +128,9 @@ export function createHowToPlayScreen(onBack: () => void): Screen {
             <p><strong>Stars:</strong> Earn 1–3 stars per level; spend stars in the Armory.</p>
             <p><strong>Tokens:</strong> Earn coins from kills and level clears; spend in the Armory on ships, guns, and upgrades.</p>
             <p><strong>Secrets:</strong> Konami on title, type COIN or ARC on menu, score 1337 / 8008 / 50k, kill milestones 50 &amp; 250, boss clears L3/L6/L9/L12.</p>
-          </section>
-          <button type="button" class="btn btn-primary" data-back>Main Menu</button>
-        </div>
-      `;
+          </section>`,
+        footerHtml: renderSubBackFooter(),
+      });
       root.querySelector("[data-back]")?.addEventListener("click", onBack);
     },
     unmount() {},
@@ -170,9 +161,13 @@ export function createChallengesScreen(onBack: () => void): Screen {
         </li>`;
         }
       ).join("");
-      root.innerHTML = `
-        <div class="screen sub-screen">
-          ${renderSubHeader("Challenges", `${meta.badges.length} / ${OG_CHALLENGES.length} cleared · ★ ${meta.stars} banked`, "— ACHIEVEMENTS —")}
+      root.innerHTML = renderSubCabinetShell({
+        headerHtml: renderSubHeader(
+          "Challenges",
+          `${meta.badges.length} / ${OG_CHALLENGES.length} cleared · ★ ${meta.stars} banked`,
+          "— ACHIEVEMENTS —"
+        ),
+        bodyHtml: `
           <section class="panel cabinet-panel daily-challenge-panel">
             <h2 class="panel-label">Daily challenge</h2>
             <div class="daily-challenge-card ${dailyDone ? "daily-challenge-card--done" : ""}">
@@ -187,9 +182,9 @@ export function createChallengesScreen(onBack: () => void): Screen {
           <p class="challenge-star-note">Complete challenges to earn stars for Armory upgrades.</p>
           <section class="panel cabinet-panel panel-flush">
             <ul class="challenge-list">${rows}</ul>
-          </section>
-          <button type="button" class="btn btn-primary" data-back>Main Menu</button>
-        </div>`;
+          </section>`,
+        footerHtml: renderSubBackFooter(),
+      });
       root.querySelector("[data-back]")?.addEventListener("click", onBack);
     },
     unmount() {},
@@ -341,9 +336,10 @@ export function createArmoryScreen(onBack: () => void): Screen {
         .join("");
 
       const paint = (): void => {
-        root.innerHTML = `
-        <div class="screen sub-screen armory-screen">
-          ${renderSubHeader("Armory", "Hangar · loadout · upgrades", "— INSERT COIN —")}
+        root.innerHTML = renderSubCabinetShell({
+          screenClass: "armory-screen",
+          headerHtml: renderSubHeader("Armory", "Hangar · loadout · upgrades", "— INSERT COIN —"),
+          bodyHtml: `
           <div class="armory-wallet panel cabinet-panel">
             <div class="armory-wallet-stat">
               <span class="armory-wallet-label">Wallet</span>
@@ -379,9 +375,9 @@ export function createArmoryScreen(onBack: () => void): Screen {
             <h2 class="panel-label">Run pickups unlocked</h2>
             <ul class="armory-pickup-list">${pickupRows}</ul>
             <p class="armory-hint">Wallet buys permanent loadout. Run pool (in-game) fuels the supply depot. No rail / pierce weapons.</p>
-          </section>
-          <button type="button" class="btn btn-primary" data-back>Main Menu</button>
-        </div>`;
+          </section>`,
+          footerHtml: renderSubBackFooter(),
+        });
         bindEvents();
         mountArmoryShipSprites(root);
         const pvShip = SHIP_PROFILES[previewShip];

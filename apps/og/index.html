@@ -59,6 +59,10 @@
                   <span class="hud-label">Level</span>
                   <span id="hud-wave" class="hud-value hud-value--cyan">1</span>
                 </div>
+                <div id="hud-endless-wrap" class="hud-stat hud-stat--endless hidden">
+                  <span class="hud-label">Mult</span>
+                  <span id="hud-endless-mult" class="hud-value hud-value--gold hud-endless-badge">×1.0</span>
+                </div>
                 <div class="hud-stat hud-stat--right">
                   <span class="hud-label">Lives</span>
                   <span id="hud-lives" class="hud-value hud-value--danger">♥♥♥</span>
@@ -85,7 +89,6 @@
               <span id="hud-run-pool" class="hud-meta-value hud-meta-value--cyan">0</span>
             </div>
           </div>
-          <div id="hud-endless-mult" class="hud-endless hidden">×1.0 ENDLESS</div>
           <div id="hud-boss-weak" class="hud-boss-weak hidden">◎ WEAK POINT</div>
           <div id="hud-combo" class="hud-combo hidden">COMBO x1</div>
         </div>
@@ -121,7 +124,10 @@
             </footer>
           </div>
         </div>
-        <div id="touch-controls">
+        <div id="touch-controls" class="touch-cabinet">
+          <div class="touch-cabinet-rail touch-cabinet-rail--left" aria-hidden="true"></div>
+          <div class="touch-cabinet-rail touch-cabinet-rail--right" aria-hidden="true"></div>
+          <p class="touch-cabinet-label" aria-hidden="true"><span class="arcade-status-dot"></span> CABINET CONTROLS</p>
           <div id="touch-move" aria-label="Move">
             <span class="touch-move-label">◀ DRAG ▶</span>
           </div>

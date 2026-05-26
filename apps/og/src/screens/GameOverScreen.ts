@@ -1,6 +1,7 @@
 import type { LocalStorageRepo } from "../storage/LocalStorageRepo";
 import type { Screen } from "./ScreenRouter";
 import { AudioManager } from "../audio/AudioManager";
+import { renderGameOverShell } from "../ui/cabinetShell";
 
 export interface GameOverScreenDeps {
   repo: LocalStorageRepo;
@@ -23,9 +24,10 @@ export class GameOverScreen implements Screen {
     const isNewHigh = rank === 1 && this.deps.score > 0;
     const projectedRank = rank > 0 ? `#${rank}` : "TOP 10";
 
-    root.innerHTML = `
-      <div class="screen sub-screen game-over-screen ${isNewHigh ? "game-over-screen--record" : ""}">
-        <header class="sub-header cabinet-mini cabinet-mini--danger sub-cabinet">
+    root.innerHTML = renderGameOverShell({
+      screenClass: isNewHigh ? "game-over-screen--record" : "",
+      headerHtml: `
+        <header class="sub-header cabinet-mini cabinet-mini--danger sub-cabinet go-cabinet-header">
           <div class="cabinet-mini-glow" aria-hidden="true"></div>
           <p class="cabinet-mini-status"><span class="arcade-status-dot arcade-status-dot--danger"></span> GAME OVER</p>
           <h1 class="screen-title screen-title--danger">${isNewHigh ? "New High Score!" : "Mission Failed"}</h1>
@@ -33,14 +35,13 @@ export class GameOverScreen implements Screen {
           <div class="screen-marquee screen-marquee--danger" aria-hidden="true">
             <span>— INSERT COIN —</span>
           </div>
-        </header>
-
+        </header>`,
+      bodyHtml: `
         <div class="game-over-score-cabinet go-score-hero">
           <span class="game-over-score-label">Final Score</span>
           <p class="final-score">${this.deps.score.toLocaleString()}</p>
           ${rank > 0 ? `<p class="go-rank-badge">Rank ${projectedRank}</p>` : ""}
         </div>
-
         ${
           qualifies
             ? `
@@ -56,14 +57,14 @@ export class GameOverScreen implements Screen {
           <button type="button" class="btn btn-save-score" data-action="save">Save Score</button>
         </section>`
             : ""
-        }
+        }`,
+      footerHtml: `
         <button type="button" class="btn btn-primary btn-deploy" data-action="retry">
           <span class="btn-deploy-label">Play Again</span>
           <span class="btn-deploy-sub">Restart from level 1</span>
         </button>
-        <button type="button" class="btn" data-action="menu">Main Menu</button>
-      </div>
-    `;
+        <button type="button" class="btn" data-action="menu">Main Menu</button>`,
+    });
 
     const inputs = [...root.querySelectorAll<HTMLInputElement>(".initials-form input")];
     const saveBtn = root.querySelector<HTMLButtonElement>('[data-action="save"]');
