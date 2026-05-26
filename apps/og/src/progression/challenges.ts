@@ -3,44 +3,61 @@ export interface ChallengeDef {
   title: string;
   description: string;
   reward: string;
+  /** Stars granted to armory wallet on first completion. */
+  starReward: number;
 }
+
+export const CHALLENGE_STAR_REWARDS: Record<string, number> = {
+  no_hit_l3: 2,
+  combo_10: 1,
+  speed_clear: 2,
+  phantom_run: 1,
+  scatter_ace: 1,
+  gun_collector: 2,
+};
 
 export const OG_CHALLENGES: ChallengeDef[] = [
   {
     id: "no_hit_l3",
     title: "Untouchable III",
     description: "Clear Level 3 without taking damage",
-    reward: "Nova Plasma pickup unlocked",
+    reward: "Nova Plasma pickup unlocked · +2 ★",
+    starReward: 2,
   },
   {
     id: "combo_10",
     title: "Chain Reaction",
     description: "Reach 10x combo in a single level",
-    reward: "+500 bonus score",
+    reward: "+500 bonus score · +1 ★",
+    starReward: 1,
   },
   {
     id: "speed_clear",
     title: "Blitz IV",
     description: "Clear Level 4 in under 45 seconds",
-    reward: "Speed badge",
+    reward: "Speed badge · +2 ★",
+    starReward: 2,
   },
   {
     id: "phantom_run",
     title: "Ghost Pilot",
     description: "Clear any level while flying the Phantom hull",
-    reward: "Phantom badge",
+    reward: "Phantom badge · +1 ★",
+    starReward: 1,
   },
   {
     id: "scatter_ace",
     title: "Scatter Ace",
     description: "Clear a level with Scatter Fan equipped",
-    reward: "Scatter badge",
+    reward: "Scatter badge · +1 ★",
+    starReward: 1,
   },
   {
     id: "gun_collector",
     title: "Arsenal",
     description: "Unlock 5 weapons in the Armory",
-    reward: "Gun rack badge",
+    reward: "Gun rack badge · +2 ★",
+    starReward: 2,
   },
 ];
 

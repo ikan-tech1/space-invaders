@@ -11,7 +11,7 @@ import {
 } from "../progression/metaStore";
 import { ARMORY_GUNS, type ArmoryGunId } from "../progression/armoryGuns";
 import { SHIP_PROFILES, type ShipId } from "../progression/ships";
-import { GUN_VOLLEY_LABELS } from "../game/weaponVolley";
+import { GUN_VOLLEY_LABELS, getGunCompareStats } from "../game/weaponVolley";
 import { POWERUP_LABELS, type PowerUpType } from "../config";
 import { mountArmoryGunPreviews, mountArmoryShipSprites } from "../ui/armoryGunPreview";
 
@@ -139,7 +139,7 @@ export function createChallengesScreen(onBack: () => void): Screen {
         <li class="challenge-item ${meta.badges.includes(c.id) ? "done" : ""}">
           <div class="challenge-header">
             <strong>${c.title}</strong>
-            ${meta.badges.includes(c.id) ? '<span class="challenge-badge">Complete</span>' : ""}
+            ${meta.badges.includes(c.id) ? '<span class="challenge-badge">Complete</span>' : `<span class="challenge-stars">+${c.starReward} ★</span>`}
           </div>
           <p class="challenge-desc">${c.description}</p>
           <span class="challenge-reward">${c.reward}</span>
@@ -147,7 +147,8 @@ export function createChallengesScreen(onBack: () => void): Screen {
       ).join("");
       root.innerHTML = `
         <div class="screen sub-screen">
-          ${renderSubHeader("Challenges", `${meta.badges.length} / ${OG_CHALLENGES.length} cleared`, "— ACHIEVEMENTS —")}
+          ${renderSubHeader("Challenges", `${meta.badges.length} / ${OG_CHALLENGES.length} cleared · ★ ${meta.stars} banked`, "— ACHIEVEMENTS —")}
+          <p class="challenge-star-note">Complete challenges to earn stars for Armory upgrades.</p>
           <section class="panel cabinet-panel panel-flush">
             <ul class="challenge-list">${rows}</ul>
           </section>
@@ -169,16 +170,56 @@ export function createArmoryScreen(onBack: () => void): Screen {
       const meta = loadOgMeta();
       const equippedShip = meta.equippedShip;
       const equippedGun = meta.equippedGun;
+      let previewShip: ShipId = equippedShip;
+      let previewGun: ArmoryGunId = equippedGun;
 
-      const shipCards = (Object.keys(SHIP_PROFILES) as ShipId[])
-        .map((id) => {
-          const s = SHIP_PROFILES[id];
-          const owned = meta.unlockedShips.includes(id);
-          const equipped = equippedShip === id;
-          const speedPct = Math.round(s.speedMult * 100);
-          const firePct = Math.round(s.fireCooldownMult * 100);
-          return `
-          <article class="armory-ship-card ${equipped ? "armory-ship-card--equipped" : ""}" data-ship="${id}">
+      const renderCompare = (): string => {
+        const eqShip = SHIP_PROFILES[equippedShip];
+        const pvShip = SHIP_PROFILES[previewShip];
+        const eqGunStats = getGunCompareStats(equippedGun);
+        const pvGunStats = getGunCompareStats(previewGun);
+        const shipDiff = (a: number, b: number, inv = false) => {
+          const d = b - a;
+          if (d === 0) return "—";
+          const good = inv ? d < 0 : d > 0;
+          return `<span class="compare-delta ${good ? "compare-delta--good" : "compare-delta--bad"}">${d > 0 ? "+" : ""}${Math.round(d * (inv ? 100 : 100))}${inv ? "% fire" : "% spd"}</span>`;
+        };
+        return `
+          <section class="panel cabinet-panel armory-compare" data-compare-panel>
+            <h2 class="panel-label">Loadout compare</h2>
+            <div class="armory-compare-grid">
+              <div class="armory-compare-col">
+                <span class="armory-compare-tag">Equipped</span>
+                <strong>${eqShip.name}</strong>
+                <span class="armory-compare-stat">Spd ${Math.round(eqShip.speedMult * 100)}% · Fire ${Math.round(eqShip.fireCooldownMult * 100)}% · Hull ${Math.round(eqShip.hitboxScale * 100)}%</span>
+                <strong class="armory-compare-gun">${GUN_VOLLEY_LABELS[equippedGun]}</strong>
+                <span class="armory-compare-stat">${eqGunStats.volleySize} bolts · ${eqGunStats.cooldownTier} · ${eqGunStats.bypassSlot ? "Multi-slot" : "Classic slot"}</span>
+              </div>
+              <div class="armory-compare-vs">vs</div>
+              <div class="armory-compare-col armory-compare-col--preview">
+                <span class="armory-compare-tag">Preview</span>
+                <strong>${pvShip.name}</strong>
+                <span class="armory-compare-stat">Spd ${Math.round(pvShip.speedMult * 100)}% ${previewShip !== equippedShip ? shipDiff(eqShip.speedMult, pvShip.speedMult) : ""}</span>
+                <span class="armory-compare-stat">Fire ${Math.round(pvShip.fireCooldownMult * 100)}% ${previewShip !== equippedShip ? shipDiff(eqShip.fireCooldownMult, pvShip.fireCooldownMult, true) : ""}</span>
+                <strong class="armory-compare-gun">${GUN_VOLLEY_LABELS[previewGun]}</strong>
+                <span class="armory-compare-stat">${pvGunStats.volleySize} bolts · ${pvGunStats.cooldownTier} · ${pvGunStats.bypassSlot ? "Multi-slot" : "Classic slot"}</span>
+              </div>
+            </div>
+            <p class="armory-compare-hint">Tap a ship or gun card to preview stats before equipping.</p>
+          </section>`;
+      };
+
+      const renderShipCards = (): string =>
+        (Object.keys(SHIP_PROFILES) as ShipId[])
+          .map((id) => {
+            const s = SHIP_PROFILES[id];
+            const owned = meta.unlockedShips.includes(id);
+            const equipped = equippedShip === id;
+            const selected = previewShip === id;
+            const speedPct = Math.round(s.speedMult * 100);
+            const firePct = Math.round(s.fireCooldownMult * 100);
+            return `
+          <article class="armory-ship-card ${equipped ? "armory-ship-card--equipped" : ""} ${selected ? "armory-ship-card--selected" : ""}" data-ship="${id}" data-preview-ship="${id}" role="button" tabindex="0">
             <canvas class="armory-ship-preview" width="56" height="40"
               data-ship-preview="${s.spriteKey}" data-ship-color="${s.color}" aria-hidden="true"></canvas>
             <div class="armory-ship-info">
@@ -198,15 +239,18 @@ export function createArmoryScreen(onBack: () => void): Screen {
               }
             </div>
           </article>`;
-        })
-        .join("");
+          })
+          .join("");
 
-      const gunCards = ARMORY_GUNS.map((g) => {
-        const owned = meta.unlockedGuns.includes(g.id);
-        const equipped = equippedGun === g.id;
-        const label = GUN_VOLLEY_LABELS[g.id];
-        return `
-        <article class="armory-gun-card ${equipped ? "armory-gun-card--equipped" : ""}" data-gun="${g.id}">
+      const renderGunCards = (): string =>
+        ARMORY_GUNS.map((g) => {
+          const owned = meta.unlockedGuns.includes(g.id);
+          const equipped = equippedGun === g.id;
+          const selected = previewGun === g.id;
+          const label = GUN_VOLLEY_LABELS[g.id];
+          const stats = getGunCompareStats(g.id);
+          return `
+        <article class="armory-gun-card ${equipped ? "armory-gun-card--equipped" : ""} ${selected ? "armory-gun-card--selected" : ""}" data-gun="${g.id}" data-preview-gun="${g.id}" role="button" tabindex="0">
           <canvas class="armory-gun-preview" width="120" height="64" data-gun-preview="${g.id}" aria-label="${label} firing preview"></canvas>
           <div class="armory-gun-body">
           <div class="armory-gun-head">
@@ -214,6 +258,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
             ${equipped ? '<span class="armory-equipped-badge">Equipped</span>' : ""}
           </div>
           <p class="armory-gun-desc">${g.description}</p>
+          <p class="armory-gun-stats">${stats.volleySize} bolts · ${stats.cooldownTier} · ${stats.bypassSlot ? "Multi-slot" : "Classic"}</p>
           ${
             equipped
               ? ""
@@ -225,7 +270,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
           }
           </div>
         </article>`;
-      }).join("");
+        }).join("");
 
       const upgradeRows = (Object.keys(UPGRADE_COSTS) as OgMetaUpgrade[])
         .map((id) => {
@@ -248,12 +293,13 @@ export function createArmoryScreen(onBack: () => void): Screen {
         )
         .join("");
 
-      root.innerHTML = `
+      const paint = (): void => {
+        root.innerHTML = `
         <div class="screen sub-screen armory-screen">
           ${renderSubHeader("Armory", "Hangar · loadout · upgrades", "— INSERT COIN —")}
           <div class="armory-wallet panel cabinet-panel">
             <div class="armory-wallet-stat">
-              <span class="armory-wallet-label">Tokens</span>
+              <span class="armory-wallet-label">Wallet</span>
               <span class="armory-wallet-value armory-wallet-value--token">◎ ${meta.tokens}</span>
             </div>
             <div class="armory-wallet-stat">
@@ -269,89 +315,114 @@ export function createArmoryScreen(onBack: () => void): Screen {
               <span class="armory-wallet-value">${GUN_VOLLEY_LABELS[equippedGun]}</span>
             </div>
           </div>
+          ${renderCompare()}
           <section class="panel cabinet-panel">
             <h2 class="panel-label">Ship hangar</h2>
-            <div class="armory-ship-grid">${shipCards}</div>
+            <div class="armory-ship-grid">${renderShipCards()}</div>
           </section>
           <section class="panel cabinet-panel">
             <h2 class="panel-label">Weapon rack</h2>
-            <div class="armory-gun-grid">${gunCards}</div>
+            <div class="armory-gun-grid">${renderGunCards()}</div>
           </section>
           <section class="panel cabinet-panel">
-            <h2 class="panel-label">Star upgrades</h2>
+            <h2 class="panel-label">Star upgrades <span class="panel-label-sub">Earn ★ from challenges &amp; levels</span></h2>
             <div class="upgrade-list">${upgradeRows}</div>
           </section>
           <section class="panel cabinet-panel panel-flush">
             <h2 class="panel-label">Run pickups unlocked</h2>
             <ul class="armory-pickup-list">${pickupRows}</ul>
-            <p class="armory-hint">Earn tokens from kills &amp; levels. Stars buy passive upgrades. No rail / pierce weapons.</p>
+            <p class="armory-hint">Wallet buys permanent loadout. Run pool (in-game) fuels the supply depot. No rail / pierce weapons.</p>
           </section>
           <button type="button" class="btn btn-primary" data-back>Main Menu</button>
         </div>`;
+        bindEvents();
+        mountArmoryShipSprites(root);
+        const pvShip = SHIP_PROFILES[previewShip];
+        previewCleanup = mountArmoryGunPreviews(root, {
+          selectedGun: previewGun,
+          shipSprite: pvShip.spriteKey,
+          shipColor: pvShip.color,
+        });
+      };
 
-      const refresh = (): void => createArmoryScreen(onBack).mount(root);
+      const bindEvents = (): void => {
+        root.querySelector("[data-back]")?.addEventListener("click", onBack);
 
-      root.querySelectorAll("[data-buy-ship]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const id = (btn as HTMLElement).dataset.buyShip as ShipId;
-          const m = loadOgMeta();
-          const cost = SHIP_PROFILES[id].tokenCost;
-          if (m.unlockedShips.includes(id) || m.tokens < cost) return;
-          m.tokens -= cost;
-          m.unlockedShips.push(id);
-          m.equippedShip = id;
-          saveOgMeta(m);
-          refresh();
+        root.querySelectorAll("[data-preview-ship]").forEach((el) => {
+          el.addEventListener("click", (e) => {
+            if ((e.target as HTMLElement).closest("button")) return;
+            previewShip = (el as HTMLElement).dataset.previewShip as ShipId;
+            paint();
+          });
         });
-      });
-      root.querySelectorAll("[data-equip-ship]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const id = (btn as HTMLElement).dataset.equipShip as ShipId;
-          const m = loadOgMeta();
-          if (!m.unlockedShips.includes(id)) return;
-          m.equippedShip = id;
-          saveOgMeta(m);
-          refresh();
+        root.querySelectorAll("[data-preview-gun]").forEach((el) => {
+          el.addEventListener("click", (e) => {
+            if ((e.target as HTMLElement).closest("button")) return;
+            previewGun = (el as HTMLElement).dataset.previewGun as ArmoryGunId;
+            paint();
+          });
         });
-      });
-      root.querySelectorAll("[data-buy-gun]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const id = (btn as HTMLElement).dataset.buyGun as ArmoryGunId;
-          const m = loadOgMeta();
-          const def = ARMORY_GUNS.find((g) => g.id === id)!;
-          if (m.unlockedGuns.includes(id) || m.tokens < def.tokenCost) return;
-          m.tokens -= def.tokenCost;
-          m.unlockedGuns.push(id);
-          m.equippedGun = id;
-          saveOgMeta(m);
-          refresh();
+
+        root.querySelectorAll("[data-buy-ship]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const id = (btn as HTMLElement).dataset.buyShip as ShipId;
+            const cost = SHIP_PROFILES[id].tokenCost;
+            if (meta.unlockedShips.includes(id) || meta.tokens < cost) return;
+            meta.tokens -= cost;
+            meta.unlockedShips.push(id);
+            meta.equippedShip = id;
+            previewShip = id;
+            saveOgMeta(meta);
+            paint();
+          });
         });
-      });
-      root.querySelectorAll("[data-equip-gun]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const id = (btn as HTMLElement).dataset.equipGun as ArmoryGunId;
-          const m = loadOgMeta();
-          if (!m.unlockedGuns.includes(id)) return;
-          m.equippedGun = id;
-          saveOgMeta(m);
-          refresh();
+        root.querySelectorAll("[data-equip-ship]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const id = (btn as HTMLElement).dataset.equipShip as ShipId;
+            if (!meta.unlockedShips.includes(id)) return;
+            meta.equippedShip = id;
+            previewShip = id;
+            saveOgMeta(meta);
+            paint();
+          });
         });
-      });
-      root.querySelectorAll("[data-up]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const id = (btn as HTMLElement).dataset.up as OgMetaUpgrade;
-          const m = loadOgMeta();
-          const cost = UPGRADE_COSTS[id];
-          if (m.upgrades.includes(id) || m.stars < cost) return;
-          m.stars -= cost;
-          m.upgrades.push(id);
-          saveOgMeta(m);
-          refresh();
+        root.querySelectorAll("[data-buy-gun]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const id = (btn as HTMLElement).dataset.buyGun as ArmoryGunId;
+            const def = ARMORY_GUNS.find((g) => g.id === id)!;
+            if (meta.unlockedGuns.includes(id) || meta.tokens < def.tokenCost) return;
+            meta.tokens -= def.tokenCost;
+            meta.unlockedGuns.push(id);
+            meta.equippedGun = id;
+            previewGun = id;
+            saveOgMeta(meta);
+            paint();
+          });
         });
-      });
-      root.querySelector("[data-back]")?.addEventListener("click", onBack);
-      mountArmoryShipSprites(root);
-      previewCleanup = mountArmoryGunPreviews(root);
+        root.querySelectorAll("[data-equip-gun]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const id = (btn as HTMLElement).dataset.equipGun as ArmoryGunId;
+            if (!meta.unlockedGuns.includes(id)) return;
+            meta.equippedGun = id;
+            previewGun = id;
+            saveOgMeta(meta);
+            paint();
+          });
+        });
+        root.querySelectorAll("[data-up]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const id = (btn as HTMLElement).dataset.up as OgMetaUpgrade;
+            const cost = UPGRADE_COSTS[id];
+            if (meta.upgrades.includes(id) || meta.stars < cost) return;
+            meta.stars -= cost;
+            meta.upgrades.push(id);
+            saveOgMeta(meta);
+            paint();
+          });
+        });
+      };
+
+      paint();
     },
     unmount() {
       previewCleanup?.();

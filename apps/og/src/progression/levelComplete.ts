@@ -19,6 +19,8 @@ export interface LevelCompleteReport {
   tokensEarnedThisLevel: number;
   /** Persistent wallet after level grants. */
   walletTokens: number;
+  /** Spendable run pool (supply depot only; not armory wallet). */
+  runTokenPool: number;
   /** Endless mode payout multiplier applied this level (1 = none). */
   endlessTokenMult: number;
 }

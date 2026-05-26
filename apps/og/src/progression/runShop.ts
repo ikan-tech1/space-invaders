@@ -1,4 +1,11 @@
-export type RunConsumableId = "shield_patch" | "overdrive" | "token_boost" | "challenge_reroll";
+export type RunConsumableId =
+  | "shield_patch"
+  | "overdrive"
+  | "token_boost"
+  | "challenge_reroll"
+  | "combo_charge"
+  | "life_buffer"
+  | "magnet_burst";
 
 export interface RunConsumable {
   id: RunConsumableId;
@@ -34,6 +41,25 @@ export const RUN_CONSUMABLES: RunConsumable[] = [
     description: "Retry one failed challenge for half bonus",
     cost: 15,
     maxPerInterstitial: 1,
+  },
+  {
+    id: "combo_charge",
+    name: "Combo Charge",
+    description: "Start next level at 3× combo multiplier",
+    cost: 14,
+  },
+  {
+    id: "life_buffer",
+    name: "Life Buffer",
+    description: "Next hit costs no life (one use)",
+    cost: 22,
+    maxPerInterstitial: 1,
+  },
+  {
+    id: "magnet_burst",
+    name: "Magnet Burst",
+    description: "+2 run tokens per kill for one level",
+    cost: 16,
   },
 ];
 

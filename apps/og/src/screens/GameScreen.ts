@@ -68,6 +68,8 @@ export class GameScreen {
     const hudGun = document.getElementById("hud-gun-name")!;
     const hudShip = document.getElementById("hud-ship-name")!;
     const hudTokens = document.getElementById("hud-tokens")!;
+    const hudRunPool = document.getElementById("hud-run-pool")!;
+    const hudEndlessMult = document.getElementById("hud-endless-mult")!;
     const hudCombo = document.getElementById("hud-combo")!;
     const waveBanner = document.getElementById("wave-banner")!;
     const pauseOverlay = document.getElementById("pause-overlay")!;
@@ -116,6 +118,7 @@ export class GameScreen {
             const ok = this.game?.spendInterstitialTokens(id) ?? false;
             if (ok && this.game) {
               liveReport.walletTokens = this.game.meta.tokens;
+              liveReport.runTokenPool = this.game.runTokenPool;
             }
             return ok;
           },
@@ -135,6 +138,17 @@ export class GameScreen {
       },
       onTokensChange: (t) => {
         hudTokens.textContent = String(t);
+      },
+      onRunPoolChange: (pool) => {
+        hudRunPool.textContent = String(pool);
+      },
+      onEndlessMultChange: (mult) => {
+        if (this.deps.gameMode === "endless" && mult > 1) {
+          hudEndlessMult.classList.remove("hidden");
+          hudEndlessMult.textContent = `×${mult.toFixed(1)} ENDLESS`;
+        } else {
+          hudEndlessMult.classList.add("hidden");
+        }
       },
       onLoadoutChange: (ship, gun) => {
         hudShip.textContent = ship;
@@ -166,6 +180,14 @@ export class GameScreen {
     hudGun.textContent = this.game.getGunLabel();
     hudShip.textContent = this.game.getShipLabel();
     hudTokens.textContent = String(this.game.meta.tokens);
+    hudRunPool.textContent = String(this.game.runTokenPool);
+    if (this.deps.gameMode === "endless") {
+      const mult = 1 + Math.min(1.5, (this.game.getSaveData().wave - 1) * 0.08);
+      if (mult > 1) {
+        hudEndlessMult.classList.remove("hidden");
+        hudEndlessMult.textContent = `×${mult.toFixed(1)} ENDLESS`;
+      }
+    }
 
     this.maybeShowOnboarding();
 

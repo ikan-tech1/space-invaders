@@ -10,24 +10,9 @@ interface PreviewBullet {
   shockwave?: boolean;
 }
 
-const PREVIEW_GUNS: GunVolley[] = [
-  "single",
-  "double",
-  "twin",
-  "scatter",
-  "burst2",
-  "burst3",
-  "homing",
-  "shockwave",
-  "triple",
-];
-
 const animators = new WeakMap<HTMLCanvasElement, number>();
 
-function drawBullet(
-  ctx: CanvasRenderingContext2D,
-  b: PreviewBullet
-): void {
+function drawBullet(ctx: CanvasRenderingContext2D, b: PreviewBullet): void {
   if (b.plasma) {
     ctx.fillStyle = "#ff66cc";
     ctx.beginPath();
@@ -51,7 +36,12 @@ function drawBullet(
   ctx.fillRect(b.x - 1, b.y - 5, 3, 8);
 }
 
-function runPreview(canvas: HTMLCanvasElement, gun: GunVolley): void {
+function runPreview(
+  canvas: HTMLCanvasElement,
+  gun: GunVolley,
+  shipSprite = "player",
+  shipColor = "#00f0ff"
+): void {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
@@ -81,7 +71,9 @@ function runPreview(canvas: HTMLCanvasElement, gun: GunVolley): void {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    drawSprite(ctx, "player", px - 7, py - 8, "#00f0ff", 2);
+    const ox = shipSprite === "playerTitan" ? px - 11 : px - 7;
+    const oy = shipSprite === "playerTitan" ? py - 10 : py - 8;
+    drawSprite(ctx, shipSprite, ox, oy, shipColor, 2);
 
     fireTimer -= 1 / 60;
     if (fireTimer <= 0) {
@@ -109,15 +101,79 @@ function runPreview(canvas: HTMLCanvasElement, gun: GunVolley): void {
   tick();
 }
 
-/** Mount animated firing-range previews on gun cards in the armory. */
-export function mountArmoryGunPreviews(root: HTMLElement): () => void {
+function drawStaticPreview(
+  canvas: HTMLCanvasElement,
+  gun: GunVolley,
+  shipSprite = "player",
+  shipColor = "#00f0ff"
+): void {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  const prev = animators.get(canvas);
+  if (prev) {
+    cancelAnimationFrame(prev);
+    animators.delete(canvas);
+  }
+
+  const w = canvas.width;
+  const h = canvas.height;
+  const px = w / 2;
+  const py = h - 14;
+
+  ctx.fillStyle = "#060a14";
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = "rgba(0, 240, 255, 0.08)";
+  ctx.setLineDash([4, 6]);
+  ctx.beginPath();
+  ctx.moveTo(0, h * 0.35);
+  ctx.lineTo(w, h * 0.35);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const ox = shipSprite === "playerTitan" ? px - 11 : px - 7;
+  const oy = shipSprite === "playerTitan" ? py - 10 : py - 8;
+  drawSprite(ctx, shipSprite, ox, oy, shipColor, 2);
+
+  for (const b of createVolley(gun, px, py - 8)) {
+    drawBullet(ctx, {
+      x: b.x,
+      y: b.y - 18,
+      vy: 0,
+      plasma: b.plasma,
+      homing: b.homing,
+      shockwave: b.shockwave,
+    });
+  }
+}
+
+export interface ArmoryPreviewOptions {
+  selectedGun: GunVolley;
+  shipSprite: string;
+  shipColor: string;
+}
+
+/** Mount gun previews — only the selected card animates; others show a static frame. */
+export function mountArmoryGunPreviews(
+  root: HTMLElement,
+  options: ArmoryPreviewOptions
+): () => void {
   const canvases = root.querySelectorAll<HTMLCanvasElement>("canvas[data-gun-preview]");
   const cleanups: (() => void)[] = [];
 
   canvases.forEach((canvas) => {
     const gun = canvas.dataset.gunPreview as GunVolley;
     if (!gun) return;
-    runPreview(canvas, gun);
+    const card = canvas.closest("[data-gun]");
+    const isSelected = gun === options.selectedGun;
+
+    if (isSelected) {
+      runPreview(canvas, gun, options.shipSprite, options.shipColor);
+      card?.classList.add("armory-gun-card--previewing");
+    } else {
+      drawStaticPreview(canvas, gun, options.shipSprite, options.shipColor);
+      card?.classList.remove("armory-gun-card--previewing");
+    }
+
     cleanups.push(() => {
       const id = animators.get(canvas);
       if (id) cancelAnimationFrame(id);
@@ -137,10 +193,31 @@ export function mountArmoryShipSprites(root: HTMLElement): void {
     if (!ctx) return;
     ctx.fillStyle = "#060a14";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const ox = sprite === "playerTitan" ? 4 : 6;
-    const oy = sprite === "playerTitan" ? 2 : 4;
+    const ox = sprite === "playerTitan" ? 4 : sprite === "playerVanguard" ? 5 : 6;
+    const oy = sprite === "playerTitan" ? 2 : sprite === "playerVanguard" ? 3 : 4;
     drawSprite(ctx, sprite, ox, oy, color, 2);
   });
 }
 
-export { PREVIEW_GUNS };
+function statDelta(a: number, b: number): string {
+  const d = b - a;
+  if (d === 0) return "—";
+  return d > 0 ? `+${d}` : String(d);
+}
+
+export function renderGunCompareRow(
+  label: string,
+  equipped: string,
+  selected: string,
+  highlight = false
+): string {
+  const cls = highlight ? "armory-compare-val armory-compare-val--better" : "armory-compare-val";
+  return `
+    <div class="armory-compare-row">
+      <span class="armory-compare-label">${label}</span>
+      <span class="armory-compare-val">${equipped}</span>
+      <span class="${cls}">${selected}</span>
+    </div>`;
+}
+
+export { statDelta };

@@ -24,6 +24,11 @@ export class EasterEggRegistry {
   kills50Done = false;
   kills250Done = false;
   wave7ToastDone = false;
+  diamondFlawlessDone = false;
+  pincerFlawlessDone = false;
+  miniBossFlawlessDone = false;
+  bigBossPhase2Done = false;
+  vFormationDone = false;
 
   constructor(savedKills = 0, secretInitials = false) {
     this.totalKills = savedKills;
@@ -38,6 +43,11 @@ export class EasterEggRegistry {
     this.score50000Done = localStorage.getItem("og_score_50000") === "1";
     this.kills50Done = localStorage.getItem("og_kills_50") === "1";
     this.kills250Done = localStorage.getItem("og_kills_250") === "1";
+    this.diamondFlawlessDone = localStorage.getItem("og_secret_diamond") === "1";
+    this.pincerFlawlessDone = localStorage.getItem("og_secret_pincer") === "1";
+    this.miniBossFlawlessDone = localStorage.getItem("og_secret_miniboss_nd") === "1";
+    this.bigBossPhase2Done = localStorage.getItem("og_secret_bigboss_p2") === "1";
+    this.vFormationDone = localStorage.getItem("og_secret_vformation") === "1";
   }
 
   private static KONAMI = [
@@ -135,6 +145,52 @@ export class EasterEggRegistry {
       return { message: "250 KILLS — Phantom hull schematic!", tokens: 30 };
     }
     return null;
+  }
+
+  onFormationClear(
+    formation: string,
+    flawless: boolean,
+    arcCodeActive: boolean
+  ): EasterEggToast | null {
+    if (flawless && formation === "diamond" && !this.diamondFlawlessDone) {
+      this.diamondFlawlessDone = true;
+      localStorage.setItem("og_secret_diamond", "1");
+      return { message: "Diamond doctrine — flawless clear! +8 ◎", tokens: 8 };
+    }
+    if (flawless && formation === "pincer" && !this.pincerFlawlessDone) {
+      this.pincerFlawlessDone = true;
+      localStorage.setItem("og_secret_pincer", "1");
+      return { message: "Pincer broken — no hits! +10 ◎", tokens: 10 };
+    }
+    if (
+      flawless &&
+      arcCodeActive &&
+      formation === "classic" &&
+      !this.vFormationDone
+    ) {
+      this.vFormationDone = true;
+      localStorage.setItem("og_secret_vformation", "1");
+      return { message: "V-formation unlocked — ARC synergy! +15 ◎", tokens: 15 };
+    }
+    return null;
+  }
+
+  onBossFlawless(kind: "mini" | "big", phase2Reached: boolean): EasterEggToast | null {
+    if (kind === "mini" && !this.miniBossFlawlessDone) {
+      this.miniBossFlawlessDone = true;
+      localStorage.setItem("og_secret_miniboss_nd", "1");
+      return { message: "Mini boss — untouched! +6 ◎", tokens: 6 };
+    }
+    if (kind === "big" && phase2Reached && !this.bigBossPhase2Done) {
+      this.bigBossPhase2Done = true;
+      localStorage.setItem("og_secret_bigboss_p2", "1");
+      return { message: "Phase II takedown! +12 ◎", tokens: 12 };
+    }
+    return null;
+  }
+
+  isArcCodeActive(): boolean {
+    return this.arcCodeUsed;
   }
 
   onLevelComplete(level: number): EasterEggToast | null {

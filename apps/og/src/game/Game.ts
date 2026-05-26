@@ -37,9 +37,9 @@ import { createShields, patchShield } from "./entities/ShieldGrid";
 import type { Alien, Boss, Bullet, PowerUpDrop, Shield, UFO } from "./entities/types";
 import { formationBounds } from "./formations";
 import { LevelDirector } from "../progression/LevelDirector";
-import { CAMPAIGN_MAX_LEVEL } from "../progression/levelScript";
+import { CAMPAIGN_MAX_LEVEL, getLevelConfig } from "../progression/levelScript";
 import { bossMoveSpeed } from "../progression/bosses";
-import { ChallengeTracker } from "../progression/challenges";
+import { ChallengeTracker, OG_CHALLENGES } from "../progression/challenges";
 import { EasterEggRegistry } from "../progression/easterEggs";
 import type { LevelCompleteReport } from "../progression/levelComplete";
 import { LevelChallengeTracker } from "../progression/levelChallenges";
@@ -77,6 +77,8 @@ export interface GameCallbacks {
   onCampaignClear: () => void;
   onSlotMachine: (ctx: SlotMachineContext) => void;
   onTokensChange: (tokens: number) => void;
+  onRunPoolChange: (pool: number) => void;
+  onEndlessMultChange: (mult: number) => void;
   onLoadoutChange: (ship: string, gun: string) => void;
 }
 
@@ -138,10 +140,16 @@ export class Game {
 
   levelDamageThisLevel = false;
   runTokensEarned = 0;
+  runTokenPool = 0;
   levelTokensEarned = 0;
   interstitialPurchases: RunConsumableId[] = [];
   pendingOverdrive = false;
   pendingTokenBoost = 0;
+  pendingComboCharge = false;
+  pendingLifeBuffer = false;
+  pendingMagnetBurst = false;
+  magnetBurstActive = false;
+  bossPhase2Reached = false;
   rerolledChallengeIds = new Set<string>();
 
   constructor(
@@ -198,11 +206,14 @@ export class Game {
       for (const s of this.shields) patchShield(s);
     }
     this.runTokensEarned = 0;
+    this.runTokenPool = 0;
     this.startLevel();
     this.callbacks.onLivesChange(this.lives);
     this.callbacks.onScoreChange(this.score);
     this.callbacks.onWaveChange(this.levelDirector.level);
     this.callbacks.onTokensChange(this.meta.tokens);
+    this.callbacks.onRunPoolChange(this.runTokenPool);
+    this.callbacks.onEndlessMultChange(this.getEndlessTokenMult());
     this.callbacks.onLoadoutChange(this.getShipLabel(), this.getGunLabel());
   }
 
@@ -210,16 +221,19 @@ export class Game {
     return getShipProfile(this.meta.equippedShip);
   }
 
-  private grantTokens(amount: number, toast?: string): void {
+  private grantTokens(amount: number, toast?: string, playSecret = false): void {
     if (amount <= 0) return;
     const mult = this.getEndlessTokenMult();
     const payout = Math.max(1, Math.round(amount * mult));
     this.meta.tokens += payout;
     this.runTokensEarned += payout;
+    this.runTokenPool += payout;
     this.levelTokensEarned += payout;
     saveOgMeta(this.meta);
     this.callbacks.onTokensChange(this.meta.tokens);
+    this.callbacks.onRunPoolChange(this.runTokenPool);
     if (toast) this.callbacks.onToast(toast);
+    if (playSecret) this.audio.play("secret");
   }
 
   private getEndlessTokenMult(): number {
@@ -232,12 +246,11 @@ export class Game {
     const item = getRunConsumable(id);
     const count = this.interstitialPurchases.filter((p) => p === id).length;
     const max = item.maxPerInterstitial ?? 99;
-    if (count >= max || this.meta.tokens < item.cost) return false;
+    if (count >= max || this.runTokenPool < item.cost) return false;
 
-    this.meta.tokens -= item.cost;
+    this.runTokenPool -= item.cost;
     this.interstitialPurchases.push(id);
-    saveOgMeta(this.meta);
-    this.callbacks.onTokensChange(this.meta.tokens);
+    this.callbacks.onRunPoolChange(this.runTokenPool);
 
     switch (id) {
       case "shield_patch":
@@ -251,6 +264,18 @@ export class Game {
       case "token_boost":
         this.pendingTokenBoost += 3;
         this.callbacks.onToast("+3 tokens on next clear!");
+        break;
+      case "combo_charge":
+        this.pendingComboCharge = true;
+        this.callbacks.onToast("Combo charge armed — 3× start!");
+        break;
+      case "life_buffer":
+        this.pendingLifeBuffer = true;
+        this.callbacks.onToast("Life buffer armed!");
+        break;
+      case "magnet_burst":
+        this.pendingMagnetBurst = true;
+        this.callbacks.onToast("Magnet burst — +2 ◎ per kill next level!");
         break;
       case "challenge_reroll": {
         const failed = this.levelChallenges
@@ -276,8 +301,8 @@ export class Game {
 
   private handleEggReward(reward: ReturnType<EasterEggRegistry["onScore"]>): void {
     if (!reward) return;
-    if (reward.tokens) this.grantTokens(reward.tokens);
-    this.callbacks.onToast(reward.message);
+    if (reward.tokens) this.grantTokens(reward.tokens, reward.message, true);
+    else this.callbacks.onToast(reward.message);
     if (reward.message.includes("Phantom") && !this.meta.unlockedShips.includes("phantom")) {
       this.meta.unlockedShips.push("phantom");
       saveOgMeta(this.meta);
@@ -291,6 +316,9 @@ export class Game {
     this.levelTokensEarned = 0;
     this.interstitialPurchases = [];
     this.rerolledChallengeIds.clear();
+    this.bossPhase2Reached = false;
+    this.magnetBurstActive = this.pendingMagnetBurst;
+    this.pendingMagnetBurst = false;
     this.bullets = [];
     this.canFire = true;
     this.fireCooldown = 0;
@@ -300,9 +328,11 @@ export class Game {
     if (enc === "bigBoss") {
       this.aliens = [];
       this.boss = this.levelDirector.spawnBigBoss();
+      this.audio.playBossSpawn("big");
     } else if (enc === "miniBoss") {
       this.aliens = [];
       this.boss = this.levelDirector.spawnMiniBoss();
+      this.audio.playBossSpawn("mini");
     } else {
       this.boss = null;
       this.aliens = this.levelDirector.spawnAliens(this.difficulty);
@@ -317,6 +347,14 @@ export class Game {
       this.applyPowerUp("rapid");
       this.powerUpTimer = 8;
       this.callbacks.onToast("Overdrive engaged!");
+    }
+    if (this.pendingComboCharge) {
+      this.pendingComboCharge = false;
+      this.comboMult = 3;
+      this.comboCount = 3;
+      this.comboTimer = COMBO_WINDOW;
+      this.callbacks.onComboChange(this.comboCount, this.comboMult);
+      this.callbacks.onToast("Combo charge — 3× active!");
     }
   }
 
@@ -352,6 +390,7 @@ export class Game {
         }
         this.levelDirector.nextLevel();
         this.callbacks.onWaveChange(this.levelDirector.level);
+        this.callbacks.onEndlessMultChange(this.getEndlessTokenMult());
         this.startLevel();
       }
       this.particles.update(dt);
@@ -549,16 +588,24 @@ export class Game {
           this.levelChallenges.onShotHit();
           this.boss.hp -= this.boss.kind === "mini" ? 2 : 3;
           this.boss.weakPoint = Math.floor(Math.random() * 3);
-          this.audio.play("bossHit");
+          this.audio.playBossHit(this.boss.kind);
           if (this.boss.hp <= this.boss.maxHp * 0.5 && this.boss.kind === "big") {
             this.boss.phase = 2;
+            this.bossPhase2Reached = true;
+            this.audio.play("alienAggro");
           }
           if (this.boss.hp <= 0) {
             this.grantTokens(this.boss.kind === "mini" ? 8 : 15);
             this.addScore(BOSS_POINTS);
             this.particles.burst(this.boss.x, this.boss.y, "#ff2d95", 24);
+            const bossKind = this.boss.kind;
             this.boss.active = false;
-            this.audio.play("explosion");
+            this.audio.play("bossDefeat");
+            if (!this.levelDamageThisLevel) {
+              this.handleEggReward(
+                this.eggs.onBossFlawless(bossKind, this.bossPhase2Reached)
+              );
+            }
           }
         }
         if (hit.alien) {
@@ -569,7 +616,10 @@ export class Game {
           if (this.eggs.totalKills >= 100) {
             localStorage.setItem("og_secret_initials", "1");
           }
-          const killTokens = 1 + (this.meta.upgrades.includes("tokenMagnet") ? 1 : 0);
+          const killTokens =
+            1 +
+            (this.meta.upgrades.includes("tokenMagnet") ? 1 : 0) +
+            (this.magnetBurstActive ? 2 : 0);
           this.grantTokens(killTokens);
           this.addScore(ALIEN_POINTS[hit.alien.type] ?? 10);
           this.particles.burst(hit.alien.x + 14, hit.alien.y + 11, "#00f0ff", 14);
@@ -648,6 +698,9 @@ export class Game {
             active: true,
           });
           this.audio.play("enemyShoot");
+          if (alive.length < 12 && Math.random() < 0.35) {
+            this.audio.play("alienAggro");
+          }
         }
       }
     }
@@ -845,6 +898,17 @@ export class Game {
     this.levelDamageThisLevel = true;
     this.challenges.onDamage();
     this.levelChallenges.onDamage();
+
+    if (this.pendingLifeBuffer) {
+      this.pendingLifeBuffer = false;
+      this.invulnTimer = INVULN_TIME;
+      this.addShake(0.2);
+      this.audio.play("powerup");
+      this.callbacks.onToast("Life buffer absorbed the hit!");
+      this.respawnAfterHit();
+      return;
+    }
+
     this.lives--;
     this.invulnTimer = INVULN_TIME;
     this.addShake(0.35);
@@ -917,12 +981,28 @@ export class Game {
     if (flawless) stars = 2;
     if (isBoss) stars = 3;
 
+    if (enc === "standard") {
+      const cfg = getLevelConfig(this.levelDirector.level);
+      this.handleEggReward(
+        this.eggs.onFormationClear(
+          cfg.formation,
+          flawless,
+          this.eggs.isArcCodeActive()
+        )
+      );
+    }
+
     const levelResults = this.levelChallenges.evaluate();
     let challengeBonus = levelResults.reduce((s, c) => s + (c.passed ? c.bonus : 0), 0);
 
     const newChallenges = this.challenges.checkOnLevelComplete(this.levelDirector.level);
     for (const c of newChallenges) {
       challengeBonus += c.bonusScore;
+      const def = OG_CHALLENGES.find((ch) => ch.id === c.id);
+      if (def?.starReward) {
+        this.meta.stars += def.starReward;
+        this.callbacks.onToast(`${def.title} — +${def.starReward} ★`);
+      }
       if (c.id === "no_hit_l3" && !this.meta.unlockedPickups.includes("plasma")) {
         this.meta.unlockedPickups.push("plasma");
       }
@@ -971,8 +1051,10 @@ export class Game {
       campaignCleared,
       tokensEarnedThisLevel,
       walletTokens: this.meta.tokens,
+      runTokenPool: this.runTokenPool,
       endlessTokenMult,
     });
+    this.callbacks.onEndlessMultChange(this.getEndlessTokenMult());
     this.callbacks.onScoreChange(this.score);
   }
 

@@ -1,4 +1,4 @@
-export type ShipId = "striker" | "phantom" | "titan";
+export type ShipId = "striker" | "phantom" | "titan" | "vanguard";
 
 export interface ShipProfile {
   id: ShipId;
@@ -50,6 +50,18 @@ export const SHIP_PROFILES: Record<ShipId, ShipProfile> = {
     fireCooldownMult: 1.08,
     hitboxScale: 1.12,
     tokenCost: 200,
+  },
+  vanguard: {
+    id: "vanguard",
+    name: "Vanguard",
+    tagline: "Elite escort · tight weave",
+    color: "#7bff6e",
+    accent: "#00f0ff",
+    spriteKey: "playerVanguard",
+    speedMult: 1.08,
+    fireCooldownMult: 0.95,
+    hitboxScale: 0.95,
+    tokenCost: 160,
   },
 };
 

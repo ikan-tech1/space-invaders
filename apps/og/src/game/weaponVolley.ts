@@ -139,3 +139,26 @@ export const GUN_VOLLEY_LABELS: Record<GunVolley, string> = {
   homing: "Seeker Pods",
   shockwave: "Shockwave",
 };
+
+export interface GunCompareStats {
+  volleySize: number;
+  bypassSlot: boolean;
+  cooldownTier: string;
+  fireRatePct: number;
+}
+
+export function getGunCompareStats(profile: GunVolley): GunCompareStats {
+  const volley = createVolley(profile, 0, 0);
+  const mult = profileFireCooldownMult(profile);
+  const fireRatePct = Math.round((1 / mult) * 100);
+  let cooldownTier = "Standard";
+  if (mult >= 1.3) cooldownTier = "Slow";
+  else if (mult >= 1.1) cooldownTier = "Heavy";
+  else if (mult <= 0.9) cooldownTier = "Fast";
+  return {
+    volleySize: volley.length,
+    bypassSlot: profileBypassesBulletSlot(profile),
+    cooldownTier,
+    fireRatePct,
+  };
+}

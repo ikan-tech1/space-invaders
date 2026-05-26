@@ -8,12 +8,17 @@ export type SfxType =
   | "waveClear"
   | "gameOver"
   | "bossHit"
+  | "bossSpawn"
+  | "bossDefeat"
+  | "miniBossSpawn"
   | "playerHit"
   | "slotSpin"
   | "slotWin"
   | "slotReelStop"
   | "combo"
-  | "highScore";
+  | "highScore"
+  | "secret"
+  | "alienAggro";
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
@@ -43,6 +48,20 @@ export class AudioManager {
     g.connect(this.ctx.destination);
     osc.start();
     osc.stop(this.ctx.currentTime + duration);
+  }
+
+  playBossHit(kind: "mini" | "big" = "mini"): void {
+    this.resume();
+    if (this.muted || !this.ctx) return;
+    const base = kind === "big" ? 160 : 220;
+    this.beep(base, 0.07, "sawtooth", 0.11);
+    if (kind === "big") {
+      this.beep(95, 0.12, "sine", 0.08);
+    }
+  }
+
+  playBossSpawn(kind: "mini" | "big"): void {
+    this.play(kind === "big" ? "bossSpawn" : "miniBossSpawn");
   }
 
   playShoot(profile: string): void {
@@ -96,6 +115,28 @@ export class AudioManager {
         break;
       case "bossHit":
         this.beep(200, 0.08, "sawtooth", 0.1);
+        break;
+      case "bossSpawn":
+        this.beep(110, 0.18, "sawtooth", 0.14);
+        this.beep(165, 0.22, "square", 0.1);
+        this.beep(220, 0.28, "sawtooth", 0.08);
+        break;
+      case "miniBossSpawn":
+        this.beep(140, 0.14, "sawtooth", 0.11);
+        this.beep(210, 0.2, "square", 0.08);
+        break;
+      case "bossDefeat":
+        this.beep(330, 0.12, "square", 0.1);
+        this.beep(440, 0.12, "square", 0.09);
+        this.beep(550, 0.18, "sine", 0.08);
+        break;
+      case "alienAggro":
+        this.beep(72, 0.06, "square", 0.04);
+        break;
+      case "secret":
+        this.beep(660, 0.08, "sine", 0.08);
+        this.beep(880, 0.1, "sine", 0.07);
+        this.beep(1046, 0.14, "sine", 0.06);
         break;
       case "playerHit":
         this.beep(150, 0.25, "sawtooth", 0.12);

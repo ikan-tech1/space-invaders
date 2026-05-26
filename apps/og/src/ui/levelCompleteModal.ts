@@ -37,13 +37,13 @@ export function showLevelCompleteModal(
       const count = [...purchased].filter((id) => id === item.id).length;
       const max = item.maxPerInterstitial ?? 99;
       const soldOut = count >= max;
-      const canAfford = report.walletTokens >= item.cost;
+      const canAfford = report.runTokenPool >= item.cost;
       return `
         <button type="button" class="supply-item ${soldOut ? "supply-item--sold" : ""}"
           data-supply="${item.id}" ${soldOut || !canAfford ? "disabled" : ""}>
           <span class="supply-item-name">${item.name}</span>
           <span class="supply-item-desc">${item.description}</span>
-          <span class="supply-item-cost">${soldOut ? "Purchased" : `${item.cost} ◎`}</span>
+          <span class="supply-item-cost">${soldOut ? "Purchased" : `${item.cost} ◎ run`}</span>
         </button>`;
     }).join("");
 
@@ -84,7 +84,11 @@ export function showLevelCompleteModal(
           </div>
           ${endlessNote}
           <div class="lc-score-row">
-            <span>Wallet</span>
+            <span>Run pool <span class="lc-pool-hint">(supply depot)</span></span>
+            <strong class="lc-run-pool" data-run-pool>◎ ${report.runTokenPool}</strong>
+          </div>
+          <div class="lc-score-row">
+            <span>Wallet <span class="lc-pool-hint">(armory)</span></span>
             <strong class="lc-wallet" data-wallet>◎ ${report.walletTokens}</strong>
           </div>
           <div class="lc-score-row">
@@ -98,7 +102,7 @@ export function showLevelCompleteModal(
           report.campaignCleared
             ? ""
             : `
-        <h3 class="lc-supply-title">Supply depot <span class="lc-supply-hint">Spend tokens mid-campaign</span></h3>
+        <h3 class="lc-supply-title">Supply depot <span class="lc-supply-hint">Spend run pool mid-campaign</span></h3>
         <div class="supply-depot">${supplyRows}</div>`
         }
         <div class="screen-marquee lc-marquee" aria-hidden="true">
