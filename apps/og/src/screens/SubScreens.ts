@@ -434,10 +434,10 @@ export function createArmoryScreen(onBack: () => void): Screen {
         current: CosmeticColorId | CockpitTintId
       ): string => {
         const colors = Object.keys(COLOR_PALETTE) as CosmeticColorId[];
-        const noneOn = current === "none" ? "cosmetic-swatch--on" : "";
+        const noneOn = current === "none" ? "cosmetic-swatch--on cosmetic-swatch--selected" : "";
         const noneBtn =
           field === "cockpit"
-            ? `<button type="button" class="cosmetic-swatch cosmetic-swatch--none ${noneOn}" data-cosmetic-field="${field}" data-cosmetic-color="none" aria-label="No cockpit tint">—</button>`
+            ? `<button type="button" class="cosmetic-swatch cosmetic-swatch--none ${noneOn}" data-cosmetic-field="${field}" data-cosmetic-color="none" aria-label="No cockpit tint" aria-selected="${current === "none" ? "true" : "false"}">—</button>`
             : "";
         return `${noneBtn}${colors
           .map((id) => {
@@ -448,11 +448,11 @@ export function createArmoryScreen(onBack: () => void): Screen {
             const label = COSMETIC_COLOR_LABELS[id];
             const swatchStyle = "background:" + hex;
             const unlockedFlag = unlocked ? "1" : "0";
-            const onCls = on ? "cosmetic-swatch--on" : "";
+            const onCls = on ? "cosmetic-swatch--on cosmetic-swatch--selected" : "";
             const lockCls = !unlocked ? "cosmetic-swatch--locked" : "";
             return `<button type="button" class="cosmetic-swatch ${onCls} ${lockCls}"
               data-cosmetic-field="${field}" data-cosmetic-color="${id}" data-unlocked="${unlockedFlag}"
-              style="${swatchStyle}" aria-label="${label}${lockHint}"></button>`;
+              style="${swatchStyle}" aria-label="${label}${lockHint}" aria-selected="${on ? "true" : "false"}"></button>`;
           })
           .join("")}`;
       };
@@ -533,7 +533,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
             const firePct = Math.round(s.fireCooldownMult * 100);
             const paint = resolveShipPaint(getCosmeticsForHull(meta.shipCosmetics, id), s.color, s.accent);
             return `
-          <article class="armory-ship-card ${equipped ? "armory-ship-card--equipped" : ""} ${selected ? "armory-ship-card--selected" : ""} ${!owned ? "armory-ship-card--locked" : ""}" data-ship="${id}" data-preview-ship="${id}" role="button" tabindex="0">
+          <article class="armory-ship-card ${equipped ? "armory-ship-card--equipped" : ""} ${selected ? "armory-ship-card--selected" : ""} ${!owned ? "armory-ship-card--locked" : ""}" data-ship="${id}" data-preview-ship="${id}" role="button" tabindex="0" aria-selected="${selected ? "true" : "false"}">
             <canvas class="armory-ship-preview" width="56" height="40"
               data-ship-preview="${s.spriteKey}" data-ship-color="${paint.primary}" aria-hidden="true"></canvas>
             <div class="armory-ship-info">
@@ -577,7 +577,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
           const label = GUN_VOLLEY_LABELS[g.id];
           const stats = getGunCompareStats(g.id);
           return `
-        <article class="armory-gun-card ${equipped ? "armory-gun-card--equipped" : ""} ${selected ? "armory-gun-card--selected" : ""}" data-gun="${g.id}" data-preview-gun="${g.id}" role="button" tabindex="0">
+        <article class="armory-gun-card ${equipped ? "armory-gun-card--equipped" : ""} ${selected ? "armory-gun-card--selected" : ""}" data-gun="${g.id}" data-preview-gun="${g.id}" role="button" tabindex="0" aria-selected="${selected ? "true" : "false"}">
           <canvas class="armory-gun-preview" width="120" height="64" data-gun-preview="${g.id}" aria-label="${label} firing preview"></canvas>
           <div class="armory-gun-body">
           <div class="armory-gun-head">
@@ -620,7 +620,16 @@ export function createArmoryScreen(onBack: () => void): Screen {
         )
         .join("");
 
+      const restoreScroll = (scrollTop: number): void => {
+        requestAnimationFrame(() => {
+          const scrollEl = root.querySelector<HTMLElement>(".sub-cabinet-scroll");
+          if (scrollEl) scrollEl.scrollTop = scrollTop;
+        });
+      };
+
       const paint = (): void => {
+        const scrollEl = root.querySelector<HTMLElement>(".sub-cabinet-scroll");
+        const savedScrollTop = scrollEl?.scrollTop ?? 0;
         root.innerHTML = renderSubCabinetShell({
           screenClass: "armory-screen",
           headerHtml: renderSubHeader("Armory", "Hangar · loadout · upgrades", "— INSERT COIN —"),
@@ -675,6 +684,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
           shipSprite: pvShip.spriteKey,
           shipColor: pvPaint.primary,
         });
+        restoreScroll(savedScrollTop);
       };
 
       const saveCosmetics = (patch: Partial<ReturnType<typeof getPreviewCosmetics>>): void => {
