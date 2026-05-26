@@ -85,7 +85,11 @@ function startGame(continueRun: boolean, mode: GameMode, startLevel = 1): void {
   gameScreen.start();
 }
 
-showSplashIfNeeded(showMenu);
+showMenu();
+
+showSplashIfNeeded(() => {
+  /* Menu already mounted beneath splash — no layout swap on dismiss. */
+});
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
