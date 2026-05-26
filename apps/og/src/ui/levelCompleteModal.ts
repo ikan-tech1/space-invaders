@@ -10,6 +10,29 @@ export interface LevelCompleteModalOptions {
   endlessPurchasedIds?: EndlessConsumableId[];
 }
 
+const ARCADE_FRAME = `
+  <div class="arcade-frame" aria-hidden="true">
+    <span class="arcade-corner arcade-corner-tl"></span>
+    <span class="arcade-corner arcade-corner-tr"></span>
+    <span class="arcade-corner arcade-corner-bl"></span>
+    <span class="arcade-corner arcade-corner-br"></span>
+    <span class="arcade-scanlines"></span>
+    <span class="arcade-glow"></span>
+  </div>`;
+
+function starHero(stars: number): string {
+  return Array.from({ length: 3 }, (_, i) => {
+    const filled = i < stars;
+    return `<span class="lc-star ${filled ? "lc-star--filled" : "lc-star--empty"}" aria-hidden="true">${filled ? "★" : "☆"}</span>`;
+  }).join("");
+}
+
+function challengeIcon(passed: boolean): string {
+  return passed
+    ? `<span class="lc-challenge-icon lc-challenge-icon--pass" aria-hidden="true">✓</span>`
+    : `<span class="lc-challenge-icon lc-challenge-icon--fail" aria-hidden="true">✗</span>`;
+}
+
 export function showLevelCompleteModal(
   root: HTMLElement,
   report: LevelCompleteReport,
@@ -21,37 +44,34 @@ export function showLevelCompleteModal(
   const endlessPurchased = new Set(opts.endlessPurchasedIds ?? []);
 
   const render = (): void => {
+    const statusLabel = report.campaignCleared ? "CAMPAIGN CLEAR" : "LEVEL CLEAR";
+
     const challengeRows = report.levelChallenges
       .map(
         (c) => `
-      <li class="lc-challenge ${c.passed ? "passed" : "failed"}">
-        <span class="lc-challenge-icon">${c.passed ? "✓" : "○"}</span>
+      <li class="lc-challenge ${c.passed ? "lc-challenge--pass" : "lc-challenge--fail"}">
+        ${challengeIcon(c.passed)}
         <span class="lc-challenge-text">${c.label}</span>
-        ${c.passed ? `<span class="lc-challenge-bonus">+${c.bonus}</span>` : ""}
+        ${c.passed ? `<span class="lc-challenge-bonus">+${c.bonus}</span>` : `<span class="lc-challenge-status">—</span>`}
       </li>`
       )
       .join("");
 
-    const endlessNote =
-      report.endlessTokenMult > 1
-        ? `<div class="lc-score-row"><span>Endless multiplier</span><strong class="lc-endless-mult">×${report.endlessTokenMult.toFixed(1)}</strong></div>`
-        : "";
-
-    const supplyRows = RUN_CONSUMABLES.map((item) => {
+    const supplyChips = RUN_CONSUMABLES.map((item) => {
       const count = [...purchased].filter((id) => id === item.id).length;
       const max = item.maxPerInterstitial ?? 99;
       const soldOut = count >= max;
       const canAfford = report.runTokenPool >= item.cost;
       return `
-        <button type="button" class="supply-item ${soldOut ? "supply-item--sold" : ""}"
-          data-supply="${item.id}" ${soldOut || !canAfford ? "disabled" : ""}>
-          <span class="supply-item-name">${item.name}</span>
-          <span class="supply-item-desc">${item.description}</span>
-          <span class="supply-item-cost">${soldOut ? "Purchased" : `${item.cost} ◎ run`}</span>
+        <button type="button" class="lc-chip ${soldOut ? "lc-chip--sold" : ""} ${!soldOut && canAfford ? "lc-chip--affordable" : ""}"
+          data-supply="${item.id}" ${soldOut || !canAfford ? "disabled" : ""}
+          title="${item.description}">
+          <span class="lc-chip-name">${item.name}</span>
+          <span class="lc-chip-cost">${soldOut ? "✓" : `${item.cost} ◎`}</span>
         </button>`;
     }).join("");
 
-    const endlessRows =
+    const endlessChips =
       report.gameMode === "endless"
         ? ENDLESS_CONSUMABLES.map((item) => {
             const count = [...endlessPurchased].filter((id) => id === item.id).length;
@@ -59,32 +79,56 @@ export function showLevelCompleteModal(
             const soldOut = count >= max;
             const canAfford = report.runTokenPool >= item.cost;
             return `
-        <button type="button" class="supply-item supply-item--endless ${soldOut ? "supply-item--sold" : ""}"
-          data-endless="${item.id}" ${soldOut || !canAfford ? "disabled" : ""}>
-          <span class="supply-item-name">${item.name}</span>
-          <span class="supply-item-desc">${item.description}</span>
-          <span class="supply-item-cost">${soldOut ? "Purchased" : `${item.cost} ◎ run`}</span>
+        <button type="button" class="lc-chip lc-chip--endless ${soldOut ? "lc-chip--sold" : ""} ${!soldOut && canAfford ? "lc-chip--affordable" : ""}"
+          data-endless="${item.id}" ${soldOut || !canAfford ? "disabled" : ""}
+          title="${item.description}">
+          <span class="lc-chip-name">${item.name}</span>
+          <span class="lc-chip-cost">${soldOut ? "✓" : `${item.cost} ◎`}</span>
         </button>`;
           }).join("")
         : "";
 
+    const depotSection =
+      report.campaignCleared
+        ? ""
+        : `
+        <details class="lc-depot" open>
+          <summary class="lc-depot-toggle">
+            <span class="lc-depot-toggle-label">Supply Depot</span>
+            <span class="lc-depot-toggle-pool" data-run-pool>◎ ${report.runTokenPool} run</span>
+          </summary>
+          <p class="lc-depot-hint">Spend run pool before continuing — scroll for more</p>
+          <div class="lc-chip-track" role="list">${supplyChips}</div>
+          ${
+            report.gameMode === "endless"
+              ? `
+          <p class="lc-depot-subtitle">Endless modifiers</p>
+          <div class="lc-chip-track lc-chip-track--endless" role="list">${endlessChips}</div>`
+              : ""
+          }
+        </details>`;
+
+    const endlessMultTile =
+      report.endlessTokenMult > 1
+        ? `
+        <div class="lc-stat-tile lc-stat-tile--accent">
+          <span class="lc-stat-icon" aria-hidden="true">×</span>
+          <span class="lc-stat-label">Endless mult</span>
+          <strong class="lc-stat-value lc-stat-value--gold">×${report.endlessTokenMult.toFixed(1)}</strong>
+        </div>`
+        : "";
+
     root.innerHTML = `
-    <div class="level-complete-panel arcade-cabinet arcade-cabinet--modal">
-      <div class="arcade-frame" aria-hidden="true">
-        <span class="arcade-corner arcade-corner-tl"></span>
-        <span class="arcade-corner arcade-corner-tr"></span>
-        <span class="arcade-corner arcade-corner-bl"></span>
-        <span class="arcade-corner arcade-corner-br"></span>
-        <span class="arcade-scanlines"></span>
-        <span class="arcade-glow"></span>
-      </div>
-      <div class="level-complete-header">
-        <p class="cabinet-mini-status lc-status"><span class="arcade-status-dot"></span> LEVEL CLEAR</p>
-        <h2 class="lc-title">${report.campaignCleared ? "Campaign Cleared" : "Level Clear"}</h2>
-        <p class="lc-level">Level ${report.level} complete</p>
-        <div class="lc-stars">${"★".repeat(report.stars)}${"☆".repeat(3 - report.stars)}</div>
-      </div>
-      <div class="level-complete-body">
+    <div class="level-complete-panel arcade-cabinet arcade-cabinet--modal lc-shell">
+      ${ARCADE_FRAME}
+
+      <header class="lc-hero">
+        <p class="lc-hero-status"><span class="arcade-status-dot"></span> ${statusLabel}</p>
+        <div class="lc-stars-hero" aria-label="${report.stars} of 3 stars">${starHero(report.stars)}</div>
+        <p class="lc-hero-sub">Level ${report.level} complete</p>
+      </header>
+
+      <div class="lc-scroll">
         ${
           report.narrativeBeat
             ? `
@@ -95,54 +139,62 @@ export function showLevelCompleteModal(
         </section>`
             : ""
         }
-        <div class="lc-scores">
-          <div class="lc-score-row">
-            <span>Level score</span>
-            <strong class="lc-level-score">+${report.levelScore.toLocaleString()}</strong>
+
+        <div class="lc-stat-grid">
+          <div class="lc-stat-tile lc-stat-tile--hero">
+            <span class="lc-stat-icon" aria-hidden="true">◆</span>
+            <span class="lc-stat-label">Total score</span>
+            <strong class="lc-stat-value">${report.totalScore.toLocaleString()}</strong>
+          </div>
+          <div class="lc-stat-tile">
+            <span class="lc-stat-icon" aria-hidden="true">+</span>
+            <span class="lc-stat-label">Level score</span>
+            <strong class="lc-stat-value lc-stat-value--cyan">+${report.levelScore.toLocaleString()}</strong>
           </div>
           ${
             report.challengeBonus > 0
-              ? `<div class="lc-score-row"><span>Challenge bonus</span><strong class="lc-bonus">+${report.challengeBonus.toLocaleString()}</strong></div>`
+              ? `
+          <div class="lc-stat-tile">
+            <span class="lc-stat-icon" aria-hidden="true">★</span>
+            <span class="lc-stat-label">Challenge bonus</span>
+            <strong class="lc-stat-value lc-stat-value--gold">+${report.challengeBonus.toLocaleString()}</strong>
+          </div>`
               : ""
           }
-          <div class="lc-score-row lc-total">
-            <span>Total score</span>
-            <strong>${report.totalScore.toLocaleString()}</strong>
+          <div class="lc-stat-tile">
+            <span class="lc-stat-icon" aria-hidden="true">◎</span>
+            <span class="lc-stat-label">Tokens earned</span>
+            <strong class="lc-stat-value lc-stat-value--token">+${report.tokensEarnedThisLevel}</strong>
           </div>
-          <div class="lc-score-row lc-token-row">
-            <span>Tokens this level</span>
-            <strong class="lc-tokens-earned">+${report.tokensEarnedThisLevel} ◎</strong>
+          ${endlessMultTile}
+          <div class="lc-stat-tile lc-stat-tile--run-pool">
+            <span class="lc-stat-icon" aria-hidden="true">⬡</span>
+            <span class="lc-stat-label">Run pool</span>
+            <strong class="lc-stat-value lc-stat-value--cyan" data-run-pool-display>◎ ${report.runTokenPool}</strong>
+            <span class="lc-stat-hint">Supply depot</span>
           </div>
-          ${endlessNote}
-          <div class="lc-score-row">
-            <span>Run pool <span class="lc-pool-hint">(supply depot)</span></span>
-            <strong class="lc-run-pool" data-run-pool>◎ ${report.runTokenPool}</strong>
+          <div class="lc-stat-tile lc-stat-tile--wallet">
+            <span class="lc-stat-icon" aria-hidden="true">◈</span>
+            <span class="lc-stat-label">Wallet</span>
+            <strong class="lc-stat-value lc-stat-value--token" data-wallet>◎ ${report.walletTokens}</strong>
+            <span class="lc-stat-hint">Armory bank</span>
           </div>
-          <div class="lc-score-row">
-            <span>Wallet <span class="lc-pool-hint">(armory)</span></span>
-            <strong class="lc-wallet" data-wallet>◎ ${report.walletTokens}</strong>
-          </div>
-          <div class="lc-score-row">
-            <span>Lives remaining</span>
-            <strong class="lc-lives">${"♥".repeat(Math.max(0, report.lives)) || "—"}</strong>
+          <div class="lc-stat-tile lc-stat-tile--lives">
+            <span class="lc-stat-icon" aria-hidden="true">♥</span>
+            <span class="lc-stat-label">Lives</span>
+            <strong class="lc-stat-value lc-stat-value--danger">${"♥".repeat(Math.max(0, report.lives)) || "—"}</strong>
           </div>
         </div>
-        <h3 class="lc-challenges-title">Level challenges</h3>
-        <ul class="lc-challenge-list">${challengeRows}</ul>
-        ${
-          report.campaignCleared
-            ? ""
-            : `
-        <h3 class="lc-supply-title">Supply depot <span class="lc-supply-hint">Spend run pool mid-campaign</span></h3>
-        <div class="supply-depot">${supplyRows}</div>
-        ${
-          report.gameMode === "endless"
-            ? `
-        <h3 class="lc-supply-title lc-supply-title--endless">Endless shop <span class="lc-supply-hint">Run modifiers · endless only</span></h3>
-        <div class="supply-depot supply-depot--endless">${endlessRows}</div>`
-            : ""
-        }`
-        }
+
+        <section class="lc-section">
+          <h3 class="lc-section-title">Level challenges</h3>
+          <ul class="lc-challenge-list">${challengeRows}</ul>
+        </section>
+
+        ${depotSection}
+      </div>
+
+      <footer class="lc-footer">
         <div class="screen-marquee lc-marquee" aria-hidden="true">
           <span>${report.campaignCleared ? "ENDLESS UNLOCKED" : `NEXT: LEVEL ${report.nextLevel}`}</span>
         </div>
@@ -150,7 +202,7 @@ export function showLevelCompleteModal(
           <span class="btn-deploy-label">Continue</span>
           <span class="btn-deploy-sub">${report.campaignCleared ? "Return to menu" : `Proceed to level ${report.nextLevel}`}</span>
         </button>
-      </div>
+      </footer>
     </div>
   `;
 

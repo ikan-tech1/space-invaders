@@ -164,14 +164,27 @@ export class CanvasRenderer {
     const x = boss.x;
     const y = boss.y;
     const mini = boss.kind === "mini";
-    const sprite = mini ? "bossMini" : "bossBig";
-    const color = mini ? COLORS.magenta : COLORS.boss;
-    const ox = mini ? 24 : 36;
+    const sprite = boss.spriteKey || (mini ? "bossMini" : "bossBig");
+    const color = boss.color || (mini ? COLORS.magenta : COLORS.boss);
+    const accent = boss.accent || COLORS.gold;
+    const scale = mini ? 2 : 3;
+    const gridW = mini ? 7 : 9;
+    const ox = (gridW * scale) / 2;
     const oy = mini ? 20 : 28;
-    drawSprite(ctx, sprite, x - ox, y - oy, color, mini ? 2 : 3);
+    drawSprite(ctx, sprite, x - ox, y - oy, color, scale);
+
+    if (boss.phase === 2) {
+      ctx.save();
+      ctx.strokeStyle = `${accent}88`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y + 8, mini ? 34 : 48, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     if (boss.telegraphTimer > 0) {
-      const maxT = boss.phase === 2 ? 0.55 : 0.75;
+      const maxT = boss.phase === 2 ? 0.65 : 0.8;
       const intensity = Math.min(1, boss.telegraphTimer / maxT);
       const pulse = 0.35 + Math.sin(Date.now() / 60) * 0.3 * intensity;
       const radius = (mini ? 38 : 52) + (1 - intensity) * 12;

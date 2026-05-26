@@ -25,19 +25,20 @@ export class GameOverScreen implements Screen {
 
     root.innerHTML = `
       <div class="screen sub-screen game-over-screen ${isNewHigh ? "game-over-screen--record" : ""}">
-        <header class="sub-header cabinet-mini cabinet-mini--danger">
+        <header class="sub-header cabinet-mini cabinet-mini--danger sub-cabinet">
           <div class="cabinet-mini-glow" aria-hidden="true"></div>
           <p class="cabinet-mini-status"><span class="arcade-status-dot arcade-status-dot--danger"></span> GAME OVER</p>
-          <h1 class="screen-title screen-title--danger">${isNewHigh ? "New High Score!" : "Game Over"}</h1>
+          <h1 class="screen-title screen-title--danger">${isNewHigh ? "New High Score!" : "Mission Failed"}</h1>
           <p class="screen-subtitle">Level ${this.deps.wave}${rank > 0 ? ` · Rank ${projectedRank}` : ""}</p>
           <div class="screen-marquee screen-marquee--danger" aria-hidden="true">
             <span>— INSERT COIN —</span>
           </div>
         </header>
 
-        <div class="game-over-score-cabinet">
+        <div class="game-over-score-cabinet go-score-hero">
           <span class="game-over-score-label">Final Score</span>
           <p class="final-score">${this.deps.score.toLocaleString()}</p>
+          ${rank > 0 ? `<p class="go-rank-badge">Rank ${projectedRank}</p>` : ""}
         </div>
 
         ${

@@ -221,6 +221,8 @@ export function showSlotMachine(
         </div>
         <p class="slot-result hidden" id="slot-result"></p>
         <p class="slot-result-detail hidden" id="slot-result-detail"></p>
+      </div>
+      <footer class="slot-machine-footer">
         <div class="screen-marquee slot-marquee" aria-hidden="true">
           <span>♥ LIFE · ✦ POWER · ◆ SHIELDS · ◎ TOKENS · ☼ WIND</span>
         </div>
@@ -231,7 +233,7 @@ export function showSlotMachine(
         <button type="button" class="btn btn-primary slot-continue hidden" id="slot-continue">
           Continue
         </button>
-      </div>
+      </footer>
     </div>
   `;
 

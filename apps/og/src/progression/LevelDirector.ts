@@ -20,6 +20,10 @@ export class LevelDirector {
     return getLevelBanner(this.level);
   }
 
+  getSectorIdentity(): string {
+    return getLevelConfig(this.level).identity;
+  }
+
   spawnAliens(_difficulty: Difficulty): Alien[] {
     const cfg = getLevelConfig(this.level);
     let aliens = buildFormation(cfg.formation, cfg.rows, cfg.cols, 40, 72);
@@ -27,19 +31,19 @@ export class LevelDirector {
     return aliens;
   }
 
-  spawnMiniBoss(): Boss {
-    return spawnBoss(this.level, "mini");
+  spawnMiniBoss(difficulty: Difficulty): Boss {
+    return spawnBoss(this.level, "mini", difficulty);
   }
 
-  spawnBigBoss(): Boss {
-    return spawnBoss(this.level, "big");
+  spawnBigBoss(difficulty: Difficulty): Boss {
+    return spawnBoss(this.level, "big", difficulty);
   }
 
   speedMult(difficulty: Difficulty): number {
     const cfg = getLevelConfig(this.level);
     const diff =
       difficulty === "casual" ? 0.75 : difficulty === "insane" ? 1.35 : 1;
-    return cfg.speedMult * diff * (1 + (this.level - 1) * 0.03);
+    return cfg.speedMult * diff * (1 + (this.level - 1) * 0.025);
   }
 
   fireMult(difficulty: Difficulty): number {

@@ -38,7 +38,14 @@ import type { Alien, Boss, Bullet, PowerUpDrop, Shield, UFO } from "./entities/t
 import { formationBounds } from "./formations";
 import { LevelDirector } from "../progression/LevelDirector";
 import { CAMPAIGN_MAX_LEVEL, getLevelConfig } from "../progression/levelScript";
-import { bossMoveSpeed } from "../progression/bosses";
+import {
+  bossAttackCooldown,
+  bossDamagePerHit,
+  bossTelegraphDuration,
+  executeBossAttack,
+  maybeSpawnBossAdds,
+  updateBossMovement,
+} from "../progression/bosses";
 import { ChallengeTracker, OG_CHALLENGES } from "../progression/challenges";
 import { EasterEggRegistry } from "../progression/easterEggs";
 import { getCampaignBeat } from "../progression/campaignNarrative";
@@ -66,7 +73,12 @@ import {
   type DailyRunStats,
 } from "../progression/dailyChallenges";
 import type { FormationType } from "../config";
-import { getShipProfile } from "../progression/ships";
+import {
+  getShipProfile,
+  shipBossDamageBonus,
+  shipComboWindowBonus,
+  shipTokenEarningsMult,
+} from "../progression/ships";
 import type { SlotMachineContext, SlotOutcome } from "../ui/slotMachine";
 
 export type GameState =
@@ -258,7 +270,7 @@ export class Game {
 
   private grantTokens(amount: number, toast?: string, playSecret = false): void {
     if (amount <= 0) return;
-    const mult = this.getEndlessTokenMult();
+    const mult = this.getEndlessTokenMult() * shipTokenEarningsMult(this.meta.equippedShip);
     const payout = Math.max(1, Math.round(amount * mult));
     this.meta.tokens += payout;
     this.runTokensEarned += payout;
@@ -406,11 +418,11 @@ export class Game {
     const enc = this.levelDirector.encounter;
     if (enc === "bigBoss") {
       this.aliens = [];
-      this.boss = this.levelDirector.spawnBigBoss();
+      this.boss = this.levelDirector.spawnBigBoss(this.difficulty);
       this.audio.playBossSpawn("big");
     } else if (enc === "miniBoss") {
       this.aliens = [];
-      this.boss = this.levelDirector.spawnMiniBoss();
+      this.boss = this.levelDirector.spawnMiniBoss(this.difficulty);
       this.audio.playBossSpawn("mini");
     } else {
       this.boss = null;
@@ -695,7 +707,10 @@ export class Game {
         }
         if (hit.boss && this.boss) {
           this.levelChallenges.onShotHit();
-          this.boss.hp -= this.boss.kind === "mini" ? 2 : 3;
+          this.boss.hp -= bossDamagePerHit(
+            this.boss,
+            shipBossDamageBonus(this.meta.equippedShip)
+          );
           this.boss.weakPoint = Math.floor(Math.random() * 3);
           this.audio.playBossHit(this.boss.kind);
           if (this.boss.hp <= this.boss.maxHp * 0.5 && this.boss.kind === "big") {
@@ -707,9 +722,10 @@ export class Game {
             this.grantTokens(this.boss.kind === "mini" ? 8 : 15);
             this.runBossDefeated = true;
             this.addScore(BOSS_POINTS);
-            this.particles.burst(this.boss.x, this.boss.y, "#ff2d95", 24);
+            this.particles.burst(this.boss.x, this.boss.y, this.boss.accent, 24);
             const bossKind = this.boss.kind;
             this.boss.active = false;
+            for (const a of this.aliens) a.alive = false;
             this.audio.play("bossDefeat");
             if (!this.levelDamageThisLevel) {
               this.handleEggReward(
@@ -870,12 +886,16 @@ export class Game {
       this.callbacks.onBossWeakPoint(false, "");
       return;
     }
-    const spd = bossMoveSpeed(this.boss.kind);
-    this.boss.x += this.boss.direction * spd * dt;
-    const margin = this.boss.kind === "mini" ? 60 : 80;
-    if (this.boss.x < margin || this.boss.x > CANVAS_WIDTH - margin) {
-      this.boss.direction *= -1;
+
+    updateBossMovement(this.boss, dt);
+
+    const adds = maybeSpawnBossAdds(this.boss, dt);
+    if (adds.length) {
+      this.aliens.push(...adds);
+      this.particles.burst(this.boss.x, this.boss.y + 36, this.boss.accent, 10);
+      this.audio.play("alienAggro");
     }
+
     this.bossWeakTimer += dt;
     if (this.bossWeakTimer > 2) {
       this.boss.weakPoint = Math.floor(Math.random() * 3);
@@ -883,21 +903,15 @@ export class Game {
     }
 
     const wpLabels = ["LEFT CORE", "CENTER CORE", "RIGHT CORE"];
-    this.callbacks.onBossWeakPoint(true, wpLabels[this.boss.weakPoint] ?? "WEAK POINT");
+    this.callbacks.onBossWeakPoint(
+      true,
+      `${this.boss.name.split(" ").pop()?.toUpperCase() ?? "BOSS"} · ${wpLabels[this.boss.weakPoint] ?? "WEAK POINT"}`
+    );
 
     if (this.boss.telegraphTimer > 0) {
       this.boss.telegraphTimer -= dt;
       if (this.boss.telegraphTimer <= 0) {
-        const burst = this.boss.kind === "mini" ? 2 : this.boss.phase === 2 ? 5 : 3;
-        for (let i = 0; i < burst; i++) {
-          this.bullets.push({
-            x: this.boss.x + (Math.random() - 0.5) * 90,
-            y: this.boss.y + 30,
-            vy: ENEMY_BULLET_SPEED * (this.boss.phase === 2 ? 1.35 : 1.15),
-            fromPlayer: false,
-            active: true,
-          });
-        }
+        executeBossAttack(this.boss, this.bullets, this.playerX);
         this.audio.play("enemyShoot");
         if (this.boss.phase === 2) this.audio.play("alienAggro");
       }
@@ -905,11 +919,16 @@ export class Game {
     }
 
     this.boss.attackCooldown -= dt;
-    const baseRate = this.boss.kind === "mini" ? 1.8 : this.boss.phase === 2 ? 1.2 : 2.4;
     if (this.boss.attackCooldown <= 0) {
-      this.boss.telegraphTimer = this.boss.phase === 2 ? 0.55 : 0.75;
-      this.boss.attackCooldown = baseRate;
-      this.particles.burst(this.boss.x, this.boss.y + 18, "#ff4466", this.boss.kind === "mini" ? 8 : 14);
+      this.boss.telegraphTimer = bossTelegraphDuration(this.boss);
+      this.boss.attackCooldown = bossAttackCooldown(this.boss);
+      const mini = this.boss.kind === "mini";
+      this.particles.burst(
+        this.boss.x,
+        this.boss.y + 18,
+        this.boss.accent,
+        mini ? 8 : 14
+      );
       this.addShake(this.boss.phase === 2 ? 0.12 : 0.08);
       this.audio.play("alienAggro");
     }
@@ -1013,7 +1032,9 @@ export class Game {
 
   private registerComboKill(): void {
     const comboWindow =
-      COMBO_WINDOW + (this.meta.upgrades.includes("comboExtend") ? 0.5 : 0);
+      COMBO_WINDOW +
+      shipComboWindowBonus(this.meta.equippedShip) +
+      (this.meta.upgrades.includes("comboExtend") ? 0.5 : 0);
     this.comboTimer = comboWindow;
     this.comboCount++;
     this.comboMult = Math.min(COMBO_MAX, 1 + Math.floor(this.comboCount / 2));
@@ -1158,7 +1179,7 @@ export class Game {
     }
     this.score += challengeBonus;
     this.meta.stars += stars;
-    const levelTokens = 5 + stars * 3;
+    const levelTokens = 5 + stars * 3 + this.getShipProfile().levelClearTokenBonus;
     if (this.pendingTokenBoost > 0) {
       this.grantTokens(this.pendingTokenBoost);
       this.pendingTokenBoost = 0;

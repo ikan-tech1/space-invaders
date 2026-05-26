@@ -1,4 +1,5 @@
-import { getEncounterType } from "./levelScript";
+import { getEncounterType, getLevelConfig } from "./levelScript";
+import { BIG_BOSSES, MINI_BOSSES, getBigBossArchetype, getMiniBossArchetype } from "./bosses";
 
 export interface SectorBriefing {
   level: number;
@@ -7,9 +8,18 @@ export interface SectorBriefing {
   body: string;
   tip: string;
   threat: string;
+  codename: string;
+  bossName?: string;
 }
 
-const SECTOR_BRIEFINGS: Record<number, Omit<SectorBriefing, "level" | "sector">> = {
+function bossNameForLevel(level: number): string | undefined {
+  const enc = getEncounterType(level);
+  if (enc === "miniBoss") return MINI_BOSSES[getMiniBossArchetype(level)].name;
+  if (enc === "bigBoss") return BIG_BOSSES[getBigBossArchetype(level)].name;
+  return undefined;
+}
+
+const SECTOR_BRIEFINGS: Record<number, Omit<SectorBriefing, "level" | "sector" | "codename" | "bossName">> = {
   1: {
     title: "Sector I — First Contact",
     body: "Light alien patrol. Learn the march rhythm and shield discipline.",
@@ -23,8 +33,8 @@ const SECTOR_BRIEFINGS: Record<number, Omit<SectorBriefing, "level" | "sector">>
     threat: "Low",
   },
   3: {
-    title: "Sector I — Mini Boss",
-    body: "A mini boss blocks the lane. Watch for telegraphed volleys.",
+    title: "Sector I — The Bulwark",
+    body: "The Bulwark blocks the lane with wide spread volleys. Watch telegraph flashes.",
     tip: "Aim for the glowing weak point — it shifts every few seconds.",
     threat: "Medium",
   },
@@ -41,8 +51,8 @@ const SECTOR_BRIEFINGS: Record<number, Omit<SectorBriefing, "level" | "sector">>
     threat: "Medium",
   },
   6: {
-    title: "Sector II — Big Boss",
-    body: "First big boss. Phase II triggers below half HP — expect burst fire.",
+    title: "Sector II — The Hive Sentinel",
+    body: "First big boss. Phase II below half HP — cross-burst patterns intensify.",
     tip: "Endless mode unlocks after this sector.",
     threat: "High",
   },
@@ -59,8 +69,8 @@ const SECTOR_BRIEFINGS: Record<number, Omit<SectorBriefing, "level" | "sector">>
     threat: "High",
   },
   9: {
-    title: "Sector III — Mini Boss Redux",
-    body: "Return of the mini boss with tighter patterns.",
+    title: "Sector III — The Swarm Queen",
+    body: "The Swarm Queen spawns drone escorts while firing aimed bursts.",
     tip: "Life Buffer absorbs one hit — great before boss sectors.",
     threat: "High",
   },
@@ -72,32 +82,45 @@ const SECTOR_BRIEFINGS: Record<number, Omit<SectorBriefing, "level" | "sector">>
   },
   11: {
     title: "Sector IV — Pincer Finale",
-    body: "Last standard wave before the final boss.",
+    body: "Last standard wave before the mothership.",
     tip: "Review armory loadout — scatter and homing excel here.",
     threat: "Extreme",
   },
   12: {
-    title: "Sector IV — Final Boss",
-    body: "The mothership. Survive Phase II and claim campaign victory.",
+    title: "Sector IV — The Overmind",
+    body: "The Overmind mothership. Survive Phase II homing volleys and claim victory.",
     tip: "Three stars for a boss clear. Lucky Reels only on your last life.",
     threat: "Extreme",
   },
 };
 
 export function getSectorBriefing(level: number): SectorBriefing {
+  const cfg = getLevelConfig(level);
   const enc = getEncounterType(level);
+  const bossName = bossNameForLevel(level);
   const base = SECTOR_BRIEFINGS[level] ?? {
-    title: `Sector — Level ${level}`,
-    body: "Unknown sector. Stay sharp.",
+    title: `Sector ${cfg.sector} — ${cfg.codename}`,
+    body: cfg.identity,
     tip: "Clear waves to earn run tokens for the supply depot.",
-    threat: "Unknown",
+    threat: cfg.threat,
   };
-  const sector = Math.ceil(level / 3);
+
   let body = base.body;
-  if (enc === "miniBoss" && level !== 3 && level !== 9) {
-    body = "Mini boss encounter. Telegraph flashes warn before volleys.";
-  } else if (enc === "bigBoss") {
-    body = "Big boss encounter. Phase II below 50% HP — burst patterns intensify.";
+  if (level > 12) {
+    body = cfg.identity;
+  } else if (enc === "miniBoss" && level !== 3 && level !== 9) {
+    body = `${bossName ?? "Mini boss"} encounter. Telegraph flashes warn before volleys.`;
+  } else if (enc === "bigBoss" && level !== 6 && level !== 12) {
+    body = `${bossName ?? "Big boss"} encounter. Phase II below 50% HP.`;
   }
-  return { level, sector, ...base, body };
+
+  return {
+    level,
+    sector: cfg.sector,
+    codename: cfg.codename,
+    bossName,
+    ...base,
+    body,
+    threat: cfg.threat,
+  };
 }

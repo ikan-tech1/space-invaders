@@ -1,11 +1,11 @@
 import {
-  CANVAS_WIDTH,
   getWaveConfig,
   isBossWave,
   type Difficulty,
 } from "../config";
 import { buildFormation } from "./formations";
 import type { Alien, Boss } from "./entities/types";
+import { spawnBoss as spawnLevelBoss } from "../progression/bosses";
 
 export class WaveDirector {
   wave = 1;
@@ -17,21 +17,8 @@ export class WaveDirector {
     return buildFormation(cfg.formation, cfg.rows, cfg.cols, startX, startY);
   }
 
-  spawnBoss(): Boss {
-    return {
-      x: CANVAS_WIDTH / 2,
-      y: 100,
-      hp: 30 + this.wave * 2,
-      maxHp: 30 + this.wave * 2,
-      direction: 1,
-      weakPoint: 1,
-      active: true,
-      kind: "big",
-      phase: 1,
-      fireTimer: 0,
-      telegraphTimer: 0,
-      attackCooldown: 1.8,
-    };
+  spawnBoss(difficulty: Difficulty = "classic"): Boss {
+    return spawnLevelBoss(this.wave, "big", difficulty);
   }
 
   isBossWave(): boolean {

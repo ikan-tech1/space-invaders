@@ -48,6 +48,20 @@ export interface UFO {
 
 export type BossKind = "mini" | "big";
 
+export type MiniBossArchetype = "bulwark" | "swarmQueen" | "slicer" | "bombardier";
+export type BigBossArchetype = "hiveSentinel" | "overmind" | "dreadnought";
+export type BossArchetype = MiniBossArchetype | BigBossArchetype;
+
+export type BossMovePattern = "slow" | "fast" | "bob" | "zigzag";
+export type BossAttackPattern =
+  | "spread"
+  | "aimedBurst"
+  | "spiral"
+  | "dropBomb"
+  | "crossBurst"
+  | "homingVolley"
+  | "laserSweep";
+
 export interface Boss {
   x: number;
   y: number;
@@ -62,6 +76,21 @@ export interface Boss {
   /** Countdown before boss volley — telegraph flash in renderer. */
   telegraphTimer: number;
   attackCooldown: number;
+  /** Design identity */
+  archetype: BossArchetype;
+  name: string;
+  movePattern: BossMovePattern;
+  attackPattern: BossAttackPattern;
+  /** Secondary attack in phase 2 (big bosses). */
+  phase2Attack?: BossAttackPattern;
+  /** Movement helpers */
+  baseY: number;
+  moveTimer: number;
+  spiralAngle: number;
+  spawnTimer: number;
+  color: string;
+  accent: string;
+  spriteKey: string;
 }
 
 export interface Shield {

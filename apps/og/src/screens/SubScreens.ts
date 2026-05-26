@@ -22,9 +22,9 @@ import { mountArmoryGunPreviews, mountArmoryShipSprites } from "../ui/armoryGunP
 
 function renderSubHeader(title: string, subtitle: string, marquee = "— ARCADE MENU —"): string {
   return `
-    <header class="sub-header cabinet-mini">
+    <header class="sub-header cabinet-mini sub-cabinet">
       <div class="cabinet-mini-glow" aria-hidden="true"></div>
-      <p class="cabinet-mini-status"><span class="arcade-status-dot"></span> CABINET</p>
+      <p class="cabinet-mini-status"><span class="arcade-status-dot"></span> CABINET OS</p>
       <h1 class="screen-title">${title}</h1>
       <p class="screen-subtitle">${subtitle}</p>
       <div class="screen-marquee" aria-hidden="true"><span>${marquee}</span></div>
@@ -154,15 +154,21 @@ export function createChallengesScreen(onBack: () => void): Screen {
       const daily = getDailyChallenge();
       const dailyDone = loadDailyCompletedDate() === getDailyDateKey();
       const rows = OG_CHALLENGES.map(
-        (c) => `
-        <li class="challenge-item ${meta.badges.includes(c.id) ? "done" : ""}">
-          <div class="challenge-header">
-            <strong>${c.title}</strong>
-            ${meta.badges.includes(c.id) ? '<span class="challenge-badge">Complete</span>' : `<span class="challenge-stars">+${c.starReward} ★</span>`}
+        (c) => {
+          const done = meta.badges.includes(c.id);
+          return `
+        <li class="challenge-item ${done ? "challenge-item--done" : "challenge-item--pending"}">
+          <span class="challenge-item-icon" aria-hidden="true">${done ? "✓" : "○"}</span>
+          <div class="challenge-item-body">
+            <div class="challenge-header">
+              <strong>${c.title}</strong>
+              ${done ? '<span class="challenge-badge">Complete</span>' : `<span class="challenge-stars">+${c.starReward} ★</span>`}
+            </div>
+            <p class="challenge-desc">${c.description}</p>
+            <span class="challenge-reward">${c.reward}</span>
           </div>
-          <p class="challenge-desc">${c.description}</p>
-          <span class="challenge-reward">${c.reward}</span>
-        </li>`
+        </li>`;
+        }
       ).join("");
       root.innerHTML = `
         <div class="screen sub-screen">
