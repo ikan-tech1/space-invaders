@@ -64,10 +64,19 @@ export class CanvasRenderer {
   drawShields(shields: Shield[]): void {
     const { ctx } = this;
     for (const shield of shields) {
+      const flashing = (shield.rebuildFlash ?? 0) > 0;
+      const pulse = flashing ? 0.55 + Math.sin(Date.now() * 0.02) * 0.45 : 1;
       for (let r = 0; r < SHIELD_ROWS; r++) {
         for (let c = 0; c < SHIELD_COLS; c++) {
           if (!shield.cells[r]![c]) continue;
-          ctx.fillStyle = COLORS.shield;
+          if (flashing) {
+            ctx.fillStyle = `rgba(61, 255, 138, ${0.35 + pulse * 0.65})`;
+            ctx.shadowColor = "#3dff8a";
+            ctx.shadowBlur = 8 * pulse;
+          } else {
+            ctx.fillStyle = COLORS.shield;
+            ctx.shadowBlur = 0;
+          }
           ctx.fillRect(
             shield.x + c * SHIELD_CELL,
             shield.y + r * SHIELD_CELL,
@@ -76,6 +85,7 @@ export class CanvasRenderer {
           );
         }
       }
+      ctx.shadowBlur = 0;
     }
   }
 

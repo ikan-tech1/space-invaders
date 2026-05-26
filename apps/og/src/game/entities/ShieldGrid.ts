@@ -1,5 +1,6 @@
 import {
   CANVAS_WIDTH,
+  MOVEMENT_TUNING,
   SHIELD_CELL,
   SHIELD_COLS,
   SHIELD_ROWS,
@@ -81,4 +82,42 @@ export function patchShield(shield: Shield): void {
       if (r >= 0 && r < SHIELD_ROWS) shield.cells[r]![c] = true;
     }
   }
+}
+
+/** Full arch pattern cell count for a fresh bunker. */
+function archCellEnabled(r: number, c: number): boolean {
+  return (
+    r < SHIELD_ROWS - 2 ||
+    (c > 2 && c < SHIELD_COLS - 3) ||
+    (r >= SHIELD_ROWS - 2 && c >= 4 && c <= SHIELD_COLS - 5)
+  );
+}
+
+/**
+ * Rebuild bunkers at existing positions with degraded HP.
+ * @param durability 1 = full bunker, lower = missing top/side cells
+ */
+export function rebuildShields(shields: Shield[], durability: number): void {
+  const clamped = Math.max(0.35, Math.min(1, durability));
+  for (const shield of shields) {
+    for (let r = 0; r < SHIELD_ROWS; r++) {
+      for (let c = 0; c < SHIELD_COLS; c++) {
+        if (!archCellEnabled(r, c)) {
+          shield.cells[r]![c] = false;
+          continue;
+        }
+        const rowBias = r / SHIELD_ROWS;
+        const keepChance = clamped - rowBias * (1 - clamped) * 0.35;
+        shield.cells[r]![c] = Math.random() < keepChance;
+      }
+    }
+    shield.rebuildFlash = MOVEMENT_TUNING.bunkerRebuildFlashSec;
+  }
+}
+
+export function createFreshShields(count: number, durability = 1): Shield[] {
+  const shields = createShields(count);
+  if (durability >= 0.99) return shields;
+  rebuildShields(shields, durability);
+  return shields;
 }

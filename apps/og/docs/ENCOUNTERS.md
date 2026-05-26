@@ -79,6 +79,44 @@ Endless levels 13+ add +6% HP per level above 12.
 
 ---
 
+## Alien Movement Evolution (Standard Waves)
+
+| Levels | Primary style | Also active | Player-facing label |
+|--------|---------------|-------------|---------------------|
+| 1–2 | Classic step-down | — | Standard march |
+| 3–4 | Creep drift | — | Creep formation |
+| 5–6 | Advance pressure | Extra drop every 4 edge hits | Advance pressure |
+| 7–8 | Snake wave | Alternating serpentine rows | Snake wave |
+| 9–10 | Pulse advance | Creep drift | Pulse advance |
+| 11+ | Combined assault | Creep + pulse + advance + snake (even levels) | Combined assault |
+
+Tuning lives in `config.ts` (`MOVEMENT_TUNING`) and `levelScript.ts` (`getMovementConfig`).
+
+---
+
+## Bunker Respawn
+
+- **Every 2 levels** starting at L3 on standard waves: bunkers rebuild with degraded HP (~−10% durability per cycle, floor 42%).
+- **After mini-boss clears** (L4, L10…): full rebuild toast — *Fortified bunkers restored*.
+- Rebuild triggers a green flash VFX on bunkers + wave-start toast.
+- Pickup `bunker` and run-shop `shield_patch` unchanged — guns are not nerfed.
+
+---
+
+## Strong-Gun Balance (L5+)
+
+| Mechanic | When | Effect |
+|----------|------|--------|
+| Faster march | L5+ | +3.5% speed per level (cap +18%) |
+| Heavier fire | L5+ | +6% fire mult per level; +12% at L8+ |
+| Dual shooters | L5 / L8 / L10 | 40% → 48% → 58% second shot |
+| Elite aliens | L8+ | Bottom rows promote to type-0 elites |
+| Wave reinforcements | L10+ | 2–3 skirmishers drop in every ~16s |
+
+Quint/hex/spread drop rates untouched.
+
+---
+
 ## Implementation Map
 
 | System | File |
@@ -88,6 +126,8 @@ Endless levels 13+ add +6% HP per level above 12.
 | Ship stats & passives | `src/progression/ships.ts` |
 | Boss entity fields | `src/game/entities/types.ts` |
 | Combat loop | `src/game/Game.ts` |
+| Movement scaling | `src/progression/levelScript.ts`, `src/config.ts` |
+| Bunker rebuild | `src/game/entities/ShieldGrid.ts` |
 | Boss sprites | `src/render/SpriteDrawer.ts` |
 | Telegraph / HP bar | `src/render/CanvasRenderer.ts` |
 | Sector briefings | `src/progression/sectorBriefings.ts` |

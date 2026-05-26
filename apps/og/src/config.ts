@@ -142,6 +142,33 @@ export const SLOT_TOKEN_CHANCE = 0.08;
 export const SLOT_SECOND_WIND_CHANCE = 0.06;
 export const SLOT_TOKEN_PAYOUT = 8;
 
+/** Alien march evolution — tuned per level band in levelScript.ts */
+export type AlienMovementStyle = "classic" | "advance" | "snake" | "creep" | "pulse";
+
+export const MOVEMENT_TUNING = {
+  /** Rebuild bunkers at start of every Nth level (3, 5, 7…) */
+  bunkerRespawnEvery: 2,
+  /** Also rebuild after clearing a mini-boss level */
+  bunkerRespawnOnMiniBossClear: true,
+  /** Minimum bunker durability after repeated respawns (0–1) */
+  bunkerMinDurability: 0.42,
+  /** Durability lost per respawn cycle */
+  bunkerDegradePerCycle: 0.1,
+  /** Downward drift between horizontal steps (px/s at L5 baseline) */
+  creepSpeedBase: 0.55,
+  creepSpeedPerLevel: 0.18,
+  /** Time-pressure nudge when formation stalls */
+  pulseIntervalSec: 10,
+  pulseAdvancePx: 4,
+  /** Edge hits before advance-pressure extra drop */
+  advanceEdgeHits: 4,
+  advanceExtraDropPx: 12,
+  /** Row ripple delay for snake wave (seconds per row) */
+  snakeRippleDelay: 0.045,
+  /** Flash duration when bunkers rebuild */
+  bunkerRebuildFlashSec: 1.2,
+} as const;
+
 export const PICKUP_DEFS: Record<PowerUpType, PickupDef> = {
   rapid: {
     label: "Rapid Pulse",

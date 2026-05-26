@@ -1,4 +1,4 @@
-import { getEncounterType, getLevelConfig } from "./levelScript";
+import { getEncounterType, getLevelConfig, shouldRebuildBunkers } from "./levelScript";
 import { BIG_BOSSES, MINI_BOSSES, getBigBossArchetype, getMiniBossArchetype } from "./bosses";
 
 export interface SectorBriefing {
@@ -10,6 +10,8 @@ export interface SectorBriefing {
   threat: string;
   codename: string;
   bossName?: string;
+  movementTrait?: string;
+  bunkerNote?: string;
 }
 
 function bossNameForLevel(level: number): string | undefined {
@@ -114,11 +116,26 @@ export function getSectorBriefing(level: number): SectorBriefing {
     body = `${bossName ?? "Big boss"} encounter. Phase II below 50% HP.`;
   }
 
+  const movementTrait =
+    enc === "standard" ? cfg.movementLabel : undefined;
+  const bunkerPlan = shouldRebuildBunkers(level);
+  const bunkerNote =
+    bunkerPlan.rebuild && enc === "standard" ? bunkerPlan.reason : undefined;
+
+  if (movementTrait && enc === "standard" && level <= 12) {
+    body = `${body} Movement: ${movementTrait}.`;
+  }
+  if (bunkerNote) {
+    body = `${body} ${bunkerNote} this wave.`;
+  }
+
   return {
     level,
     sector: cfg.sector,
     codename: cfg.codename,
     bossName,
+    movementTrait,
+    bunkerNote,
     ...base,
     body,
     threat: cfg.threat,

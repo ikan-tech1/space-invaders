@@ -1,4 +1,5 @@
-import type { FormationType } from "../config";
+import type { FormationType, AlienMovementStyle, Difficulty } from "../config";
+import { MOVEMENT_TUNING } from "../config";
 import { getBigBossArchetype, getMiniBossArchetype, BIG_BOSSES, MINI_BOSSES } from "./bosses";
 
 export type EncounterType = "standard" | "miniBoss" | "bigBoss";
@@ -16,6 +17,26 @@ export interface LevelConfig {
   cols: number;
   encounter: EncounterType;
   threat: "Low" | "Medium" | "High" | "Extreme";
+  movementStyle: AlienMovementStyle;
+  movementLabel: string;
+}
+
+type StoredLevelConfig = Omit<LevelConfig, "movementStyle" | "movementLabel">;
+
+export interface MovementRuntimeConfig {
+  style: AlienMovementStyle;
+  label: string;
+  creepSpeed: number;
+  pulseInterval: number;
+  pulseAdvancePx: number;
+  advanceEdgeHits: number;
+  advanceExtraDropPx: number;
+  snakeRippleDelay: number;
+  /** Blended secondary styles at high levels */
+  creepEnabled: boolean;
+  pulseEnabled: boolean;
+  advanceEnabled: boolean;
+  snakeEnabled: boolean;
 }
 
 export const CAMPAIGN_MAX_LEVEL = 12;
@@ -26,7 +47,77 @@ export function getEncounterType(level: number): EncounterType {
   return "standard";
 }
 
-const CAMPAIGN_LEVELS: LevelConfig[] = [
+function movementForLevel(level: number): { style: AlienMovementStyle; label: string } {
+  if (level <= 2) return { style: "classic", label: "Standard march" };
+  if (level <= 4) return { style: "creep", label: "Creep formation" };
+  if (level <= 6) return { style: "advance", label: "Advance pressure" };
+  if (level <= 8) return { style: "snake", label: "Snake wave" };
+  if (level <= 10) return { style: "pulse", label: "Pulse advance" };
+  return { style: "advance", label: "Combined assault" };
+}
+
+export function getMovementConfig(level: number, difficulty: Difficulty): MovementRuntimeConfig {
+  const { style, label } = movementForLevel(level);
+  const diffMult =
+    difficulty === "casual" ? 0.72 : difficulty === "insane" ? 1.28 : 1;
+  const creepSpeed =
+    (MOVEMENT_TUNING.creepSpeedBase +
+      Math.max(0, level - 4) * MOVEMENT_TUNING.creepSpeedPerLevel) *
+    diffMult;
+  const pulseInterval =
+    MOVEMENT_TUNING.pulseIntervalSec -
+    Math.min(3, Math.max(0, level - 8) * 0.35) -
+    (difficulty === "insane" ? 1.2 : difficulty === "casual" ? -1 : 0);
+  const advanceEdgeHits = Math.max(
+    3,
+    MOVEMENT_TUNING.advanceEdgeHits - Math.floor((level - 6) / 3)
+  );
+
+  const highBand = level >= 9;
+  return {
+    style,
+    label,
+    creepSpeed,
+    pulseInterval: Math.max(6, pulseInterval),
+    pulseAdvancePx: MOVEMENT_TUNING.pulseAdvancePx,
+    advanceEdgeHits,
+    advanceExtraDropPx: MOVEMENT_TUNING.advanceExtraDropPx,
+    snakeRippleDelay: MOVEMENT_TUNING.snakeRippleDelay,
+    creepEnabled: style === "creep" || highBand,
+    pulseEnabled: style === "pulse" || level >= 11,
+    advanceEnabled: style === "advance" || level >= 10,
+    snakeEnabled: style === "snake" || (level >= 11 && level % 2 === 0),
+  };
+}
+
+/** Whether bunkers should rebuild at the start of this level. */
+export function shouldRebuildBunkers(level: number): { rebuild: boolean; reason: string } {
+  if (level <= 1) return { rebuild: false, reason: "" };
+
+  const prevEnc = getEncounterType(level - 1);
+  if (
+    MOVEMENT_TUNING.bunkerRespawnOnMiniBossClear &&
+    prevEnc === "miniBoss"
+  ) {
+    return { rebuild: true, reason: "Fortified bunkers restored" };
+  }
+
+  if (level >= 3 && (level - 1) % MOVEMENT_TUNING.bunkerRespawnEvery === 0) {
+    return { rebuild: true, reason: "Bunkers rebuilt" };
+  }
+
+  return { rebuild: false, reason: "" };
+}
+
+export function bunkerDurabilityForLevel(level: number): number {
+  const cycles = Math.floor((level - 1) / MOVEMENT_TUNING.bunkerRespawnEvery);
+  return Math.max(
+    MOVEMENT_TUNING.bunkerMinDurability,
+    1 - cycles * MOVEMENT_TUNING.bunkerDegradePerCycle
+  );
+}
+
+const CAMPAIGN_LEVELS: StoredLevelConfig[] = [
   {
     level: 1,
     sector: 1,
@@ -197,7 +288,7 @@ const CAMPAIGN_LEVELS: LevelConfig[] = [
   },
 ];
 
-function scaleEndlessLevel(level: number): LevelConfig {
+function scaleEndlessLevel(level: number): StoredLevelConfig {
   const template = CAMPAIGN_LEVELS[(level - 1) % CAMPAIGN_LEVELS.length]!;
   const cycles = Math.floor((level - 1) / CAMPAIGN_LEVELS.length);
   const enc = getEncounterType(level);
@@ -232,11 +323,16 @@ function scaleEndlessLevel(level: number): LevelConfig {
   };
 }
 
+function enrichLevelConfig(cfg: StoredLevelConfig): LevelConfig {
+  const mov = movementForLevel(cfg.level);
+  return { ...cfg, movementStyle: mov.style, movementLabel: mov.label };
+}
+
 export function getLevelConfig(level: number): LevelConfig {
   if (level <= CAMPAIGN_MAX_LEVEL) {
-    return CAMPAIGN_LEVELS[level - 1]!;
+    return enrichLevelConfig(CAMPAIGN_LEVELS[level - 1]!);
   }
-  return scaleEndlessLevel(level);
+  return enrichLevelConfig(scaleEndlessLevel(level));
 }
 
 export function getLevelBanner(level: number): string {

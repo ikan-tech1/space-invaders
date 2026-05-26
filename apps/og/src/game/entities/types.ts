@@ -97,4 +97,6 @@ export interface Shield {
   cells: boolean[][];
   x: number;
   y: number;
+  /** Rebuild flash timer (seconds remaining) */
+  rebuildFlash?: number;
 }
