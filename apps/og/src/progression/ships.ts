@@ -6,6 +6,8 @@ export interface ShipProfile {
   tagline: string;
   color: string;
   accent: string;
+  /** Pixel sprite key in SpriteDrawer. */
+  spriteKey: string;
   speedMult: number;
   fireCooldownMult: number;
   hitboxScale: number;
@@ -19,6 +21,7 @@ export const SHIP_PROFILES: Record<ShipId, ShipProfile> = {
     tagline: "Balanced interceptor",
     color: "#00f0ff",
     accent: "#7bff6e",
+    spriteKey: "player",
     speedMult: 1,
     fireCooldownMult: 1,
     hitboxScale: 1,
@@ -30,6 +33,7 @@ export const SHIP_PROFILES: Record<ShipId, ShipProfile> = {
     tagline: "Fast & nimble",
     color: "#ff2d95",
     accent: "#c77dff",
+    spriteKey: "playerPhantom",
     speedMult: 1.22,
     fireCooldownMult: 0.88,
     hitboxScale: 0.88,
@@ -41,6 +45,7 @@ export const SHIP_PROFILES: Record<ShipId, ShipProfile> = {
     tagline: "Heavy hull · punchy shots",
     color: "#ffd24a",
     accent: "#ff8844",
+    spriteKey: "playerTitan",
     speedMult: 0.82,
     fireCooldownMult: 1.08,
     hitboxScale: 1.12,

@@ -15,4 +15,10 @@ export interface LevelCompleteReport {
   levelChallenges: LevelChallengeResult[];
   challengeBonus: number;
   campaignCleared: boolean;
+  /** Tokens earned during this level (kills + clear + secrets). */
+  tokensEarnedThisLevel: number;
+  /** Persistent wallet after level grants. */
+  walletTokens: number;
+  /** Endless mode payout multiplier applied this level (1 = none). */
+  endlessTokenMult: number;
 }

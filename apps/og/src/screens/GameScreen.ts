@@ -109,9 +109,20 @@ export class GameScreen {
       },
       onLevelComplete: (report) => {
         this.levelModal.classList.remove("hidden");
-        showLevelCompleteModal(this.levelModal, report, () => {
-          this.levelModal.classList.add("hidden");
-          if (this.game) this.game.interstitialTimer = 0;
+        const liveReport = { ...report };
+        showLevelCompleteModal(this.levelModal, liveReport, {
+          purchasedIds: this.game?.interstitialPurchases ?? [],
+          onPurchase: (id) => {
+            const ok = this.game?.spendInterstitialTokens(id) ?? false;
+            if (ok && this.game) {
+              liveReport.walletTokens = this.game.meta.tokens;
+            }
+            return ok;
+          },
+          onContinue: () => {
+            this.levelModal.classList.add("hidden");
+            if (this.game) this.game.interstitialTimer = 0;
+          },
         });
       },
       onToast: showToast,

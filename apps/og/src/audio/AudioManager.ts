@@ -45,6 +45,21 @@ export class AudioManager {
     osc.stop(this.ctx.currentTime + duration);
   }
 
+  playShoot(profile: string): void {
+    this.play("shoot");
+    this.resume();
+    if (this.muted || !this.ctx) return;
+    const mult = profile === "shockwave" ? 0.7 : profile === "homing" ? 1.15 : profile === "scatter" ? 1.05 : 1;
+    const base = profile === "double" || profile === "twin" ? 760 : profile === "triple" || profile === "burst3" ? 920 : 880;
+    this.beep(base * mult, 0.05, profile === "shockwave" ? "sawtooth" : "square", 0.07);
+    if (profile === "burst2" || profile === "burst3") {
+      window.setTimeout(() => this.beep(base * 0.92, 0.04, "square", 0.05), 40);
+    }
+    if (profile === "homing") {
+      this.beep(660, 0.06, "sine", 0.05);
+    }
+  }
+
   play(type: SfxType): void {
     this.resume();
     switch (type) {

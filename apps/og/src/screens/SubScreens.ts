@@ -13,6 +13,7 @@ import { ARMORY_GUNS, type ArmoryGunId } from "../progression/armoryGuns";
 import { SHIP_PROFILES, type ShipId } from "../progression/ships";
 import { GUN_VOLLEY_LABELS } from "../game/weaponVolley";
 import { POWERUP_LABELS, type PowerUpType } from "../config";
+import { mountArmoryGunPreviews, mountArmoryShipSprites } from "../ui/armoryGunPreview";
 
 function renderSubHeader(title: string, subtitle: string, marquee = "— ARCADE MENU —"): string {
   return `
@@ -117,7 +118,7 @@ export function createHowToPlayScreen(onBack: () => void): Screen {
             <p><strong>Combo:</strong> Chain kills within 2 seconds for score multipliers.</p>
             <p><strong>Stars:</strong> Earn 1–3 stars per level; spend stars in the Armory.</p>
             <p><strong>Tokens:</strong> Earn coins from kills and level clears; spend in the Armory on ships, guns, and upgrades.</p>
-            <p><strong>Secrets:</strong> Konami on title, type COIN on menu, score 1337 / 8008 / 50k, kill milestones 50 &amp; 250.</p>
+            <p><strong>Secrets:</strong> Konami on title, type COIN or ARC on menu, score 1337 / 8008 / 50k, kill milestones 50 &amp; 250, boss clears L3/L6/L9/L12.</p>
           </section>
           <button type="button" class="btn btn-primary" data-back>Main Menu</button>
         </div>
@@ -159,9 +160,12 @@ export function createChallengesScreen(onBack: () => void): Screen {
 }
 
 export function createArmoryScreen(onBack: () => void): Screen {
+  let previewCleanup: (() => void) | undefined;
+
   return {
     id: "armory",
     mount(root) {
+      previewCleanup?.();
       const meta = loadOgMeta();
       const equippedShip = meta.equippedShip;
       const equippedGun = meta.equippedGun;
@@ -175,7 +179,8 @@ export function createArmoryScreen(onBack: () => void): Screen {
           const firePct = Math.round(s.fireCooldownMult * 100);
           return `
           <article class="armory-ship-card ${equipped ? "armory-ship-card--equipped" : ""}" data-ship="${id}">
-            <div class="armory-ship-silhouette" style="--ship-color:${s.color}" aria-hidden="true"></div>
+            <canvas class="armory-ship-preview" width="56" height="40"
+              data-ship-preview="${s.spriteKey}" data-ship-color="${s.color}" aria-hidden="true"></canvas>
             <div class="armory-ship-info">
               <h3 class="armory-ship-name">${s.name}</h3>
               <p class="armory-ship-tag">${s.tagline}</p>
@@ -202,6 +207,8 @@ export function createArmoryScreen(onBack: () => void): Screen {
         const label = GUN_VOLLEY_LABELS[g.id];
         return `
         <article class="armory-gun-card ${equipped ? "armory-gun-card--equipped" : ""}" data-gun="${g.id}">
+          <canvas class="armory-gun-preview" width="120" height="64" data-gun-preview="${g.id}" aria-label="${label} firing preview"></canvas>
+          <div class="armory-gun-body">
           <div class="armory-gun-head">
             <strong>${label}</strong>
             ${equipped ? '<span class="armory-equipped-badge">Equipped</span>' : ""}
@@ -216,6 +223,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
                     ${g.tokenCost === 0 ? "Free" : `Unlock ${g.tokenCost} ◎`}
                   </button>`
           }
+          </div>
         </article>`;
       }).join("");
 
@@ -342,7 +350,12 @@ export function createArmoryScreen(onBack: () => void): Screen {
         });
       });
       root.querySelector("[data-back]")?.addEventListener("click", onBack);
+      mountArmoryShipSprites(root);
+      previewCleanup = mountArmoryGunPreviews(root);
     },
-    unmount() {},
+    unmount() {
+      previewCleanup?.();
+      previewCleanup = undefined;
+    },
   };
 }

@@ -2279,7 +2279,7 @@ body {
 }
 
 .armory-ship-card {
-  grid-template-columns: 48px 1fr auto;
+  grid-template-columns: 56px 1fr auto;
   align-items: center;
 }
 
@@ -2295,6 +2295,38 @@ body {
   background: linear-gradient(180deg, transparent 40%, var(--ship-color) 40%, var(--ship-color) 100%);
   clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
   filter: drop-shadow(0 0 6px var(--ship-color));
+}
+
+.armory-ship-preview {
+  display: block;
+  width: 56px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(0, 240, 255, 0.15);
+  background: #060a14;
+  image-rendering: pixelated;
+}
+
+.armory-gun-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(0, 240, 255, 0.12);
+  background: #060a14;
+  image-rendering: pixelated;
+}
+
+.armory-gun-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.armory-gun-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .armory-ship-name {
@@ -2384,6 +2416,104 @@ body {
   font-size: 0.75rem;
   color: var(--text-dim);
   line-height: 1.4;
+}
+
+/* ── Level complete supply depot ── */
+
+.lc-token-row .lc-tokens-earned {
+  color: #7bff6e;
+}
+
+.lc-wallet {
+  color: #7bff6e;
+}
+
+.lc-endless-mult {
+  color: var(--gold);
+}
+
+.lc-supply-title {
+  margin: 16px 0 8px;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lc-supply-hint {
+  display: block;
+  font-size: 0.65rem;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text-dim);
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+.supply-depot {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.supply-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(123, 255, 110, 0.04);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.supply-item:disabled,
+.supply-item--sold {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.supply-item-name {
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.supply-item-desc {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  line-height: 1.3;
+}
+
+.supply-item-cost {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: #7bff6e;
+}
+
+@media (max-width: 520px) {
+  .armory-wallet {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .armory-ship-grid,
+  .armory-gun-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .armory-ship-card {
+    grid-template-columns: 56px 1fr;
+    grid-template-rows: auto auto;
+  }
+
+  .armory-ship-actions {
+    grid-column: 1 / -1;
+  }
+
+  .supply-depot {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── Game over high score celebration ── */

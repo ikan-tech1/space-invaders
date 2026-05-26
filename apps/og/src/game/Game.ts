@@ -52,6 +52,7 @@ import {
   type GunVolley,
   GUN_VOLLEY_LABELS,
 } from "./weaponVolley";
+import { getRunConsumable, type RunConsumableId } from "../progression/runShop";
 import { getShipProfile } from "../progression/ships";
 import type { SlotMachineContext, SlotOutcome } from "../ui/slotMachine";
 
@@ -137,6 +138,11 @@ export class Game {
 
   levelDamageThisLevel = false;
   runTokensEarned = 0;
+  levelTokensEarned = 0;
+  interstitialPurchases: RunConsumableId[] = [];
+  pendingOverdrive = false;
+  pendingTokenBoost = 0;
+  rerolledChallengeIds = new Set<string>();
 
   constructor(
     public renderer: CanvasRenderer,
@@ -144,7 +150,12 @@ export class Game {
     public input: InputManager,
     private callbacks: GameCallbacks
   ) {
-    this.challenges = new ChallengeTracker(loadOgMeta().badges);
+    this.challenges = new ChallengeTracker(
+      loadOgMeta().badges,
+      loadOgMeta().equippedShip,
+      loadOgMeta().equippedGun,
+      loadOgMeta().unlockedGuns.length
+    );
     this.eggs = new EasterEggRegistry(0, false);
   }
 
@@ -161,7 +172,12 @@ export class Game {
     if (this.meta.upgrades.includes("extraLife")) this.lives++;
     this.score = continueRun?.score ?? 0;
     if (continueRun) this.levelDirector.level = continueRun.wave;
-    this.challenges = new ChallengeTracker(this.meta.badges);
+    this.challenges = new ChallengeTracker(
+      this.meta.badges,
+      this.meta.equippedShip,
+      this.meta.equippedGun,
+      this.meta.unlockedGuns.length
+    );
     this.eggs = new EasterEggRegistry(
       parseInt(localStorage.getItem("og_total_kills") || "0", 10),
       localStorage.getItem("og_secret_initials") === "1"
@@ -196,11 +212,66 @@ export class Game {
 
   private grantTokens(amount: number, toast?: string): void {
     if (amount <= 0) return;
-    this.meta.tokens += amount;
-    this.runTokensEarned += amount;
+    const mult = this.getEndlessTokenMult();
+    const payout = Math.max(1, Math.round(amount * mult));
+    this.meta.tokens += payout;
+    this.runTokensEarned += payout;
+    this.levelTokensEarned += payout;
     saveOgMeta(this.meta);
     this.callbacks.onTokensChange(this.meta.tokens);
     if (toast) this.callbacks.onToast(toast);
+  }
+
+  private getEndlessTokenMult(): number {
+    if (this.gameMode !== "endless") return 1;
+    return 1 + Math.min(1.5, (this.levelDirector.level - 1) * 0.08);
+  }
+
+  spendInterstitialTokens(id: RunConsumableId): boolean {
+    if (this.state !== "levelInterstitial") return false;
+    const item = getRunConsumable(id);
+    const count = this.interstitialPurchases.filter((p) => p === id).length;
+    const max = item.maxPerInterstitial ?? 99;
+    if (count >= max || this.meta.tokens < item.cost) return false;
+
+    this.meta.tokens -= item.cost;
+    this.interstitialPurchases.push(id);
+    saveOgMeta(this.meta);
+    this.callbacks.onTokensChange(this.meta.tokens);
+
+    switch (id) {
+      case "shield_patch":
+        for (const s of this.shields) patchShield(s);
+        this.callbacks.onToast("Shields patched!");
+        break;
+      case "overdrive":
+        this.pendingOverdrive = true;
+        this.callbacks.onToast("Overdrive armed!");
+        break;
+      case "token_boost":
+        this.pendingTokenBoost += 3;
+        this.callbacks.onToast("+3 tokens on next clear!");
+        break;
+      case "challenge_reroll": {
+        const failed = this.levelChallenges
+          .evaluate()
+          .filter((c) => !c.passed && !this.rerolledChallengeIds.has(c.id));
+        if (failed.length > 0) {
+          const pick = failed[Math.floor(Math.random() * failed.length)]!;
+          this.rerolledChallengeIds.add(pick.id);
+          const half = Math.floor(pick.bonus / 2);
+          this.score += half;
+          this.callbacks.onScoreChange(this.score);
+          this.callbacks.onToast(`Reroll: +${half} (${pick.label.split("—")[0]?.trim()})`);
+        } else {
+          this.score += 50;
+          this.callbacks.onScoreChange(this.score);
+          this.callbacks.onToast("Reroll: +50 consolation");
+        }
+        break;
+      }
+    }
+    return true;
   }
 
   private handleEggReward(reward: ReturnType<EasterEggRegistry["onScore"]>): void {
@@ -217,6 +288,9 @@ export class Game {
     this.challenges.startLevel();
     this.levelChallenges.startLevel(this.score);
     this.levelDamageThisLevel = false;
+    this.levelTokensEarned = 0;
+    this.interstitialPurchases = [];
+    this.rerolledChallengeIds.clear();
     this.bullets = [];
     this.canFire = true;
     this.fireCooldown = 0;
@@ -237,6 +311,13 @@ export class Game {
     this.alienDir = 1;
     this.alienTickTimer = 0;
     this.ufoTimer = 6 + Math.random() * 8;
+
+    if (this.pendingOverdrive) {
+      this.pendingOverdrive = false;
+      this.applyPowerUp("rapid");
+      this.powerUpTimer = 8;
+      this.callbacks.onToast("Overdrive engaged!");
+    }
   }
 
   showBanner(text: string): void {
@@ -385,7 +466,7 @@ export class Game {
     }
     this.fireCooldown = cooldown;
     this.canFire = bypassSlot;
-    this.audio.play("shoot");
+    this.audio.playShoot(profile);
   }
 
   private fireVolley(profile: GunVolley): void {
@@ -839,10 +920,7 @@ export class Game {
     const levelResults = this.levelChallenges.evaluate();
     let challengeBonus = levelResults.reduce((s, c) => s + (c.passed ? c.bonus : 0), 0);
 
-    const newChallenges = this.challenges.checkOnLevelComplete(
-      this.levelDirector.level,
-      this.score
-    );
+    const newChallenges = this.challenges.checkOnLevelComplete(this.levelDirector.level);
     for (const c of newChallenges) {
       challengeBonus += c.bonusScore;
       if (c.id === "no_hit_l3" && !this.meta.unlockedPickups.includes("plasma")) {
@@ -852,8 +930,17 @@ export class Game {
     this.score += challengeBonus;
     this.meta.stars += stars;
     const levelTokens = 5 + stars * 3;
+    if (this.pendingTokenBoost > 0) {
+      this.grantTokens(this.pendingTokenBoost);
+      this.pendingTokenBoost = 0;
+    }
     this.grantTokens(levelTokens);
     this.handleEggReward(this.eggs.onLevelComplete(this.levelDirector.level));
+    if (isBoss) {
+      this.handleEggReward(
+        this.eggs.onBossDefeat(this.levelDirector.level, enc === "bigBoss")
+      );
+    }
     this.meta.badges = this.challenges.getCompletedIds();
     if (this.levelDirector.level === 6) this.meta.endlessUnlocked = true;
     if (this.levelDirector.level >= CAMPAIGN_MAX_LEVEL && this.gameMode === "campaign") {
@@ -867,6 +954,9 @@ export class Game {
       this.gameMode === "campaign" &&
       this.levelDirector.level >= CAMPAIGN_MAX_LEVEL;
 
+    const tokensEarnedThisLevel = this.levelTokensEarned;
+    const endlessTokenMult = this.getEndlessTokenMult();
+
     this.state = "levelInterstitial";
     this.interstitialTimer = 5;
     this.callbacks.onLevelComplete({
@@ -879,6 +969,9 @@ export class Game {
       levelChallenges: levelResults,
       challengeBonus,
       campaignCleared,
+      tokensEarnedThisLevel,
+      walletTokens: this.meta.tokens,
+      endlessTokenMult,
     });
     this.callbacks.onScoreChange(this.score);
   }
@@ -900,10 +993,16 @@ export class Game {
     for (const p of this.powerUps) renderer.drawPowerUp(p);
     renderer.drawBullets(this.bullets);
     const ship = this.getShipProfile();
-    renderer.drawPlayer(this.playerX, this.playerY, this.invulnTimer > 0, ship.color);
+    renderer.drawPlayer(
+      this.playerX,
+      this.playerY,
+      this.invulnTimer > 0,
+      ship.color,
+      ship.spriteKey
+    );
     if (this.cloneTimer > 0) {
-      renderer.drawPlayer(this.playerX - 36, this.playerY, true, ship.color);
-      renderer.drawPlayer(this.playerX + 36, this.playerY, true, ship.color);
+      renderer.drawPlayer(this.playerX - 36, this.playerY, true, ship.color, ship.spriteKey);
+      renderer.drawPlayer(this.playerX + 36, this.playerY, true, ship.color, ship.spriteKey);
     }
     renderer.drawParticles(particles);
     if (this.shakeTimer > 0) renderer.clearShake();

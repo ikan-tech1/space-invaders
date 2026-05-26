@@ -24,6 +24,24 @@ export const OG_CHALLENGES: ChallengeDef[] = [
     description: "Clear Level 4 in under 45 seconds",
     reward: "Speed badge",
   },
+  {
+    id: "phantom_run",
+    title: "Ghost Pilot",
+    description: "Clear any level while flying the Phantom hull",
+    reward: "Phantom badge",
+  },
+  {
+    id: "scatter_ace",
+    title: "Scatter Ace",
+    description: "Clear a level with Scatter Fan equipped",
+    reward: "Scatter badge",
+  },
+  {
+    id: "gun_collector",
+    title: "Arsenal",
+    description: "Unlock 5 weapons in the Armory",
+    reward: "Gun rack badge",
+  },
 ];
 
 export class ChallengeTracker {
@@ -31,9 +49,21 @@ export class ChallengeTracker {
   levelDamageTaken = false;
   levelStartTime = 0;
   maxComboThisLevel = 1;
+  equippedShip: string;
+  equippedGun: string;
+  unlockedGunCount: number;
 
-  constructor(completedIds: string[] = []) {
+  constructor(completedIds: string[] = [], equippedShip = "striker", equippedGun = "single", unlockedGunCount = 1) {
     completedIds.forEach((id) => this.completed.add(id));
+    this.equippedShip = equippedShip;
+    this.equippedGun = equippedGun;
+    this.unlockedGunCount = unlockedGunCount;
+  }
+
+  setLoadout(ship: string, gun: string, unlockedGuns: number): void {
+    this.equippedShip = ship;
+    this.equippedGun = gun;
+    this.unlockedGunCount = unlockedGuns;
   }
 
   startLevel(): void {
@@ -50,7 +80,7 @@ export class ChallengeTracker {
     this.maxComboThisLevel = Math.max(this.maxComboThisLevel, mult);
   }
 
-  checkOnLevelComplete(level: number, score: number): { id: string; bonusScore: number }[] {
+  checkOnLevelComplete(level: number): { id: string; bonusScore: number }[] {
     const newly: { id: string; bonusScore: number }[] = [];
     const add = (id: string, bonus = 0) => {
       if (!this.completed.has(id)) {
@@ -63,8 +93,9 @@ export class ChallengeTracker {
     if (this.maxComboThisLevel >= 10) add("combo_10", 500);
     const elapsed = (performance.now() - this.levelStartTime) / 1000;
     if (level === 4 && elapsed < 45) add("speed_clear");
-
-    void score;
+    if (this.equippedShip === "phantom") add("phantom_run");
+    if (this.equippedGun === "scatter") add("scatter_ace");
+    if (this.unlockedGunCount >= 5) add("gun_collector");
     return newly;
   }
 

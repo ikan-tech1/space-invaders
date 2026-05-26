@@ -91,9 +91,17 @@ export class CanvasRenderer {
     }
   }
 
-  drawPlayer(x: number, y: number, invulnBlink: boolean, shipColor = COLORS.player): void {
+  drawPlayer(
+    x: number,
+    y: number,
+    invulnBlink: boolean,
+    shipColor = COLORS.player,
+    spriteKey = "player"
+  ): void {
     if (invulnBlink && Math.floor(Date.now() / 100) % 2 === 0) return;
-    drawSprite(this.ctx, "player", x - 7, y - 8, shipColor, 2);
+    const ox = spriteKey === "playerTitan" ? 8 : 7;
+    const oy = spriteKey === "playerTitan" ? 10 : 8;
+    drawSprite(this.ctx, spriteKey, x - ox, y - oy, shipColor, 2);
   }
 
   drawBullets(bullets: Bullet[]): void {
