@@ -18,6 +18,8 @@ export interface Bullet {
   plasma?: boolean;
   homing?: boolean;
   shockwave?: boolean;
+  /** Side-ship / drone volley damage scale (default 1). */
+  damageScale?: number;
   active: boolean;
 }
 

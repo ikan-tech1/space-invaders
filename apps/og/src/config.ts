@@ -11,6 +11,9 @@ export type PowerUpType =
   | "plasma"
   | "bunker"
   | "clone"
+  | "wingmen"
+  | "phantomFleet"
+  | "escortDrones"
   | "twin"
   | "triple"
   | "quint"
@@ -416,6 +419,36 @@ export const PICKUP_DEFS: Record<PowerUpType, PickupDef> = {
     weight: 5,
     requiresMetaUnlock: "clone",
   },
+  wingmen: {
+    label: "Wingmen",
+    category: "special",
+    durationClass: "timed",
+    durationSec: 8,
+    symbol: "⇉",
+    rarity: "uncommon",
+    weight: 4,
+    minCampaignLevel: 2,
+  },
+  phantomFleet: {
+    label: "Phantom Fleet",
+    category: "special",
+    durationClass: "timed",
+    durationSec: 5,
+    symbol: "⋮⋮",
+    rarity: "rare",
+    weight: 3,
+    minCampaignLevel: 4,
+  },
+  escortDrones: {
+    label: "Escort Drones",
+    category: "special",
+    durationClass: "timed",
+    durationSec: 12,
+    symbol: "◉",
+    rarity: "uncommon",
+    weight: 4,
+    minCampaignLevel: 3,
+  },
   clearRow: {
     label: "Row Purge",
     category: "special",
@@ -482,7 +515,15 @@ export const GOOD_DROP_TYPES: PowerUpType[] = [
   "comboAura",
   "shield",
   "tokenBurst",
+  "wingmen",
+  "phantomFleet",
 ];
+
+/** Max side-ship sprites (wingmen / clone / phantom) to limit clutter. */
+export const MAX_FLEET_SIDE_SHIPS = 3;
+
+/** Side volley damage multiplier for phantom fleet wing ships. */
+export const PHANTOM_FLEET_SIDE_DAMAGE = 0.7;
 
 export const CURSED_TYPES: PowerUpType[] = ["curseSolo", "curseSlowFire", "curseJam"];
 

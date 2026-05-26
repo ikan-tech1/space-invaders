@@ -109,12 +109,43 @@ export class CanvasRenderer {
     y: number,
     invulnBlink: boolean,
     shipColor = COLORS.player,
-    spriteKey = "player"
+    spriteKey = "player",
+    opts?: { accent?: string; cockpit?: string | null; ghost?: boolean }
   ): void {
     if (invulnBlink && Math.floor(Date.now() / 100) % 2 === 0) return;
     const ox = spriteKey === "playerTitan" ? 8 : 7;
     const oy = spriteKey === "playerTitan" ? 10 : 8;
-    drawSprite(this.ctx, spriteKey, x - ox, y - oy, shipColor, 2);
+    const ctx = this.ctx;
+    if (opts?.accent && !opts.ghost) {
+      ctx.save();
+      ctx.globalAlpha = 0.35 + Math.sin(Date.now() / 120) * 0.12;
+      ctx.fillStyle = opts.accent;
+      ctx.fillRect(x - 3, y + 6, 6, 10);
+      ctx.restore();
+    }
+    if (opts?.ghost) ctx.globalAlpha = 0.55;
+    drawSprite(ctx, spriteKey, x - ox, y - oy, shipColor, 2);
+    if (opts?.ghost) ctx.globalAlpha = 1;
+    if (opts?.cockpit) {
+      ctx.save();
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = opts.cockpit;
+      ctx.fillRect(x - 2, y - 6, 4, 3);
+      ctx.restore();
+    }
+  }
+
+  drawEscortDrone(x: number, y: number, color: string): void {
+    const { ctx } = this;
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 
   drawMagnetAura(x: number, y: number, active: boolean): void {

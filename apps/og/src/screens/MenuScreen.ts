@@ -5,7 +5,10 @@ import {
   loadDailyCompletedDate,
 } from "../progression/dailyChallenges";
 import { EasterEggRegistry } from "../progression/easterEggs";
-import { loadOgMeta, saveOgMeta } from "../progression/metaStore";
+import { loadOgMeta, saveOgMeta, unlockCosmeticColor } from "../progression/metaStore";
+import { queuePendingToast } from "../progression/pendingToasts";
+import { getCosmeticsForHull, resolveShipPaint } from "../progression/shipCosmetics";
+import { mountHangarHeroPreview } from "../ui/armoryGunPreview";
 import { getEndlessTier } from "../progression/endlessProgression";
 import { drainPendingToasts } from "../progression/pendingToasts";
 import { SHIP_PROFILES } from "../progression/ships";
@@ -62,7 +65,7 @@ export class MenuScreen implements Screen {
               <span class="arcade-status-dot"></span>
               <span>ARCADE ONLINE</span>
             </div>
-            <div class="arcade-invaders arcade-invaders--march" aria-hidden="true">
+            <div class="arcade-invaders arcade-invaders--march" data-invader-row aria-hidden="true" title="???">
               <svg viewBox="0 0 88 12" width="88" height="12" focusable="false">
                 <g fill="currentColor">
                   <rect x="2" y="2" width="2" height="2"/><rect x="6" y="0" width="2" height="2"/>
@@ -99,6 +102,7 @@ export class MenuScreen implements Screen {
               <span class="arcade-title-line arcade-title-line--glow">INVADERS</span>
             </h1>
             <p class="arcade-tagline">Classic Arcade Edition</p>
+            <canvas class="menu-hero-ship" data-ship-hero width="120" height="72" aria-hidden="true"></canvas>
             <div class="menu-cabinet-meta">
               <div class="menu-stat-ring menu-stat-ring--intro" aria-label="Challenge progress ${badgeCount} of ${challengeTotal}">
                 <svg viewBox="0 0 64 64" class="menu-stat-ring-svg" aria-hidden="true">
@@ -130,7 +134,11 @@ export class MenuScreen implements Screen {
               </span>
               <span class="menu-stat-chip">
                 <span class="menu-stat-chip-label">Ship</span>
-                <span class="menu-stat-chip-value">${SHIP_PROFILES[meta.equippedShip].name}</span>
+                <span class="menu-stat-chip-value">${(() => {
+                  const cs = getCosmeticsForHull(meta.shipCosmetics, meta.equippedShip).callsign;
+                  const name = SHIP_PROFILES[meta.equippedShip].name;
+                  return cs ? `${name} · ${cs}` : name;
+                })()}</span>
               </span>
               <span class="menu-stat-chip">
                 <span class="menu-stat-chip-label">Badges</span>
@@ -313,18 +321,53 @@ export class MenuScreen implements Screen {
       });
     }
 
+    const shipProfile = SHIP_PROFILES[meta.equippedShip];
+    const menuPaint = resolveShipPaint(
+      getCosmeticsForHull(meta.shipCosmetics, meta.equippedShip),
+      shipProfile.color,
+      shipProfile.accent
+    );
+    mountHangarHeroPreview(root, shipProfile.spriteKey, menuPaint.primary);
+
+    let invaderClicks = 0;
+    let invaderClickTimer: ReturnType<typeof setTimeout> | null = null;
+    root.querySelector("[data-invader-row]")?.addEventListener("click", () => {
+      invaderClicks++;
+      if (invaderClickTimer) clearTimeout(invaderClickTimer);
+      invaderClickTimer = setTimeout(() => {
+        invaderClicks = 0;
+      }, 2500);
+      if (invaderClicks >= 5) {
+        invaderClicks = 0;
+        const reward = this.eggs.onInvaderRowClick();
+        if (reward) applyMenuEggReward(reward, showMenuToast);
+      }
+    });
+
+    const applyMenuEggReward = (
+      reward: NonNullable<ReturnType<EasterEggRegistry["onMenuKey"]>>,
+      toast: (text: string, achievement?: boolean) => void
+    ): void => {
+      const m = loadOgMeta();
+      if (reward.tokens) m.tokens += reward.tokens;
+      if (reward.stars) m.stars += reward.stars;
+      if (reward.badge && !m.badges.includes(reward.badge)) m.badges.push(reward.badge);
+      if (reward.unlockColor) unlockCosmeticColor(m, reward.unlockColor);
+      if (reward.fleetTrialSec) {
+        localStorage.setItem("og_fleet_trial_pending", String(reward.fleetTrialSec));
+      }
+      saveOgMeta(m);
+      toast(reward.message, reward.achievement);
+      if (reward.achievement) queuePendingToast(reward.message);
+    };
+
     const onKey = (e: KeyboardEvent) => {
       const reward = this.eggs.onMenuKey(e.key);
       if (!reward) return;
       if (reward.message.startsWith("KONAMI")) {
         localStorage.setItem("og_konami_pending", "1");
       }
-      if (reward.tokens) {
-        const m = loadOgMeta();
-        m.tokens += reward.tokens;
-        saveOgMeta(m);
-      }
-      showMenuToast(reward.message);
+      applyMenuEggReward(reward, showMenuToast);
     };
     window.addEventListener("keydown", onKey);
     (root as HTMLElement & { _konamiCleanup?: () => void })._konamiCleanup = () =>

@@ -4,6 +4,7 @@ import {
   ALIEN_STEP_DOWN,
   BASE_ALIEN_H_STEP,
   BASE_ALIEN_TICK,
+  BULLET_SPEED,
   BOSS_POINTS,
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
@@ -14,7 +15,9 @@ import {
   ENEMY_BULLET_SPEED,
   getPickupDef,
   INVULN_TIME,
+  MAX_FLEET_SIDE_SHIPS,
   MAX_PICKUPS_ON_SCREEN,
+  PHANTOM_FLEET_SIDE_DAMAGE,
   MIN_ALIEN_TICK,
   pickupToastLine,
   PICKUP_CATEGORY_COLORS,
@@ -61,7 +64,13 @@ import { EasterEggRegistry } from "../progression/easterEggs";
 import { getCampaignBeat } from "../progression/campaignNarrative";
 import type { LevelCompleteReport } from "../progression/levelComplete";
 import { LevelChallengeTracker } from "../progression/levelChallenges";
-import { loadOgMeta, saveOgMeta, type OgMeta } from "../progression/metaStore";
+import { loadOgMeta, saveOgMeta, unlockCosmeticColor, type OgMeta } from "../progression/metaStore";
+import {
+  getCosmeticsForHull,
+  resolveShipPaint,
+  type ShipCosmetics,
+} from "../progression/shipCosmetics";
+import { queuePendingToast } from "../progression/pendingToasts";
 import {
   bumpVolleyTier,
   createVolley,
@@ -92,7 +101,6 @@ import {
   type DailyRunStats,
 } from "../progression/dailyChallenges";
 import { applyWeeklyProgress } from "../progression/weeklyChallenges";
-import { queuePendingToast } from "../progression/pendingToasts";
 import type { FormationType } from "../config";
 import {
   getShipProfile,
@@ -149,6 +157,12 @@ export class Game {
   fireCooldown = 0;
   canFire = true;
   cloneTimer = 0;
+  wingmenTimer = 0;
+  phantomFleetTimer = 0;
+  escortDronesTimer = 0;
+  escortDroneFireCd = 0;
+  escortDronePhase = 0;
+  levelElapsedSec = 0;
   plasmaTimer = 0;
   gunVolley: GunVolley = "single";
   gunVolleyTimer = 0;
@@ -277,6 +291,14 @@ export class Game {
       this.eggs.activateKonamiRun();
       localStorage.removeItem("og_konami_pending");
     }
+    const fleetTrial = parseInt(localStorage.getItem("og_fleet_trial_pending") || "0", 10);
+    if (fleetTrial > 0) {
+      this.phantomFleetTimer = fleetTrial;
+      this.setTimedBuff("phantomFleet", fleetTrial);
+      localStorage.removeItem("og_fleet_trial_pending");
+      this.callbacks.onToast(`FLEET trial — Phantom Fleet ${fleetTrial}s!`);
+    }
+    this.eggs.runKillStreak = 0;
     if (
       localStorage.getItem("og_secret_initials") === "1" &&
       !this.meta.unlockedPickups.includes("clone")
@@ -318,6 +340,15 @@ export class Game {
 
   private getShipProfile() {
     return getShipProfile(this.meta.equippedShip);
+  }
+
+  private getEquippedCosmetics(): ShipCosmetics {
+    return getCosmeticsForHull(this.meta.shipCosmetics, this.meta.equippedShip);
+  }
+
+  private getShipPaint() {
+    const ship = this.getShipProfile();
+    return resolveShipPaint(this.getEquippedCosmetics(), ship.color, ship.accent);
   }
 
   private grantTokens(amount: number, toast?: string, playSecret = false): void {
@@ -442,14 +473,42 @@ export class Game {
     return true;
   }
 
-  private handleEggReward(reward: ReturnType<EasterEggRegistry["onScore"]>): void {
+  private handleEggReward(reward: ReturnType<EasterEggRegistry["onScore"]> | null): void {
     if (!reward) return;
     if (reward.tokens) this.grantTokens(reward.tokens, reward.message, true);
     else this.callbacks.onToast(reward.message);
+    if (reward.stars) {
+      this.meta.stars += reward.stars;
+      saveOgMeta(this.meta);
+    }
+    if (reward.badge && !this.meta.badges.includes(reward.badge)) {
+      this.meta.badges.push(reward.badge);
+      saveOgMeta(this.meta);
+    }
+    if (reward.unlockColor) {
+      unlockCosmeticColor(this.meta, reward.unlockColor);
+    }
+    if (reward.extraUnlockColors) {
+      for (const c of reward.extraUnlockColors) unlockCosmeticColor(this.meta, c);
+    }
+    if ((reward.unlockColor || reward.extraUnlockColors?.length) && !reward.tokens) {
+      this.callbacks.onToast(reward.message);
+    }
+    if (reward.unlockPickup && !this.meta.unlockedPickups.includes(reward.unlockPickup)) {
+      this.meta.unlockedPickups.push(reward.unlockPickup);
+      saveOgMeta(this.meta);
+    }
+    if (reward.fleetTrialSec) {
+      this.phantomFleetTimer = Math.max(this.phantomFleetTimer, reward.fleetTrialSec);
+      this.setTimedBuff("phantomFleet", reward.fleetTrialSec);
+      this.callbacks.onToast(reward.message);
+    }
     if (reward.message.includes("Phantom") && !this.meta.unlockedShips.includes("phantom")) {
       this.meta.unlockedShips.push("phantom");
       saveOgMeta(this.meta);
     }
+    if (reward.achievement) queuePendingToast(reward.message);
+    saveOgMeta(this.meta);
   }
 
   startLevel(): void {
@@ -478,6 +537,11 @@ export class Game {
     this.aegisUntilHit = false;
     this.comboAuraUntilHit = false;
     this.slowTimer = 0;
+    this.levelElapsedSec = 0;
+    this.wingmenTimer = 0;
+    this.phantomFleetTimer = 0;
+    this.escortDronesTimer = 0;
+    this.escortDroneFireCd = 0;
     this.pushHudBuffs();
 
     const cfg = getLevelConfig(this.levelDirector.level);
@@ -627,6 +691,11 @@ export class Game {
       return;
     }
 
+    if (this.state === "playing") {
+      this.levelElapsedSec += dt;
+      this.updateEscortDrones(dt);
+    }
+
     this.updateShake(dt);
     this.updateBullets(dt);
     this.updatePlayer(dt);
@@ -717,13 +786,54 @@ export class Game {
     if (!this.input.isFirePressed() || this.fireCooldown > 0 || !slotOpen) return;
 
     this.fireVolley(profile);
-    if (this.cloneTimer > 0) {
-      this.bullets.push(...createVolley(profile, this.playerX - 36, this.playerY));
-      this.bullets.push(...createVolley(profile, this.playerX + 36, this.playerY));
-    }
+    this.fireFleetSideVolleys(profile);
     this.fireCooldown = cooldown;
     this.canFire = bypassSlot;
     this.audio.playShoot(profile);
+  }
+
+  private getFleetSideOffsets(): { x: number; damageScale: number }[] {
+    const out: { x: number; damageScale: number }[] = [];
+    if (this.phantomFleetTimer > 0) {
+      out.push({ x: -44, damageScale: PHANTOM_FLEET_SIDE_DAMAGE });
+      out.push({ x: 44, damageScale: PHANTOM_FLEET_SIDE_DAMAGE });
+    } else if (this.wingmenTimer > 0) {
+      out.push({ x: -36, damageScale: 1 });
+      out.push({ x: 36, damageScale: 1 });
+    } else if (this.cloneTimer > 0) {
+      out.push({ x: -36, damageScale: 1 });
+      out.push({ x: 36, damageScale: 1 });
+    }
+    return out.slice(0, MAX_FLEET_SIDE_SHIPS);
+  }
+
+  private fireFleetSideVolleys(profile: GunVolley): void {
+    for (const side of this.getFleetSideOffsets()) {
+      for (const b of createVolley(profile, this.playerX + side.x, this.playerY)) {
+        b.damageScale = side.damageScale;
+        this.bullets.push(b);
+      }
+    }
+  }
+
+  private updateEscortDrones(dt: number): void {
+    if (this.escortDronesTimer <= 0) return;
+    this.escortDronePhase += dt * 2.4;
+    this.escortDroneFireCd -= dt;
+    if (this.escortDroneFireCd > 0) return;
+    this.escortDroneFireCd = 0.4;
+    const orbitR = 30;
+    for (let i = 0; i < 2; i++) {
+      const ang = this.escortDronePhase + i * Math.PI;
+      this.bullets.push({
+        x: this.playerX + Math.cos(ang) * orbitR,
+        y: this.playerY + Math.sin(ang) * 12 - 10,
+        vy: -BULLET_SPEED * 0.72,
+        fromPlayer: true,
+        active: true,
+        damageScale: 0.55,
+      });
+    }
   }
 
   private fireVolley(profile: GunVolley): void {
@@ -804,10 +914,9 @@ export class Game {
         }
         if (hit.boss && this.boss) {
           this.levelChallenges.onShotHit();
-          this.boss.hp -= bossDamagePerHit(
-            this.boss,
-            shipBossDamageBonus(this.meta.equippedShip)
-          );
+          const scale = b.damageScale ?? 1;
+          this.boss.hp -=
+            bossDamagePerHit(this.boss, shipBossDamageBonus(this.meta.equippedShip)) * scale;
           this.boss.weakPoint = Math.floor(Math.random() * 3);
           this.audio.playBossHit(this.boss.kind);
           if (this.boss.hp <= this.boss.maxHp * 0.5 && this.boss.kind === "big") {
@@ -847,7 +956,8 @@ export class Game {
             (this.meta.upgrades.includes("tokenMagnet") ? 1 : 0) +
             (this.magnetBurstActive ? 2 : 0);
           this.grantTokens(killTokens);
-          this.addScore(ALIEN_POINTS[hit.alien.type] ?? 10);
+          const alienPts = Math.round((ALIEN_POINTS[hit.alien.type] ?? 10) * (b.damageScale ?? 1));
+          this.addScore(alienPts);
           this.particles.burst(hit.alien.x + 14, hit.alien.y + 11, "#00f0ff", 14);
           if (killTokens > 0) {
             this.particles.burst(hit.alien.x + 14, hit.alien.y + 4, "#ffd24a", 4 + killTokens);
@@ -1291,6 +1401,9 @@ export class Game {
         }
         if (key === "plasma") this.plasmaTimer = 0;
         if (key === "clone") this.cloneTimer = 0;
+        if (key === "wingmen") this.wingmenTimer = 0;
+        if (key === "phantomFleet") this.phantomFleetTimer = 0;
+        if (key === "escortDrones") this.escortDronesTimer = 0;
       } else {
         this.timedBuffTimers.set(key, next);
       }
@@ -1300,6 +1413,15 @@ export class Game {
     }
     if (this.timedBuffTimers.has("clone")) {
       this.cloneTimer = this.timedBuffTimers.get("clone")!;
+    }
+    if (this.timedBuffTimers.has("wingmen")) {
+      this.wingmenTimer = this.timedBuffTimers.get("wingmen")!;
+    }
+    if (this.timedBuffTimers.has("phantomFleet")) {
+      this.phantomFleetTimer = this.timedBuffTimers.get("phantomFleet")!;
+    }
+    if (this.timedBuffTimers.has("escortDrones")) {
+      this.escortDronesTimer = this.timedBuffTimers.get("escortDrones")!;
     }
     if (this.slowTimer > 0) this.slowTimer -= dt;
     this.pushHudBuffs();
@@ -1399,6 +1521,25 @@ export class Game {
       const dur = def.durationSec ?? 5;
       this.cloneTimer = dur;
       this.setTimedBuff("clone", dur);
+      return;
+    }
+    if (type === "wingmen") {
+      const dur = def.durationSec ?? 8;
+      this.wingmenTimer = dur;
+      this.setTimedBuff("wingmen", dur);
+      return;
+    }
+    if (type === "phantomFleet") {
+      const dur = def.durationSec ?? 5;
+      this.phantomFleetTimer = dur;
+      this.setTimedBuff("phantomFleet", dur);
+      return;
+    }
+    if (type === "escortDrones") {
+      const dur = def.durationSec ?? 12;
+      this.escortDronesTimer = dur;
+      this.escortDroneFireCd = 0;
+      this.setTimedBuff("escortDrones", dur);
       return;
     }
     if (PICKUP_WEAPON_PROFILE[type]) {
@@ -1517,6 +1658,7 @@ export class Game {
 
   private hitPlayer(): void {
     if (this.invulnTimer > 0 || this.eggs.isInvulnBuff()) return;
+    this.eggs.onPlayerDamage();
     this.levelDamageThisLevel = true;
     this.challenges.onDamage();
     this.levelChallenges.onDamage();
@@ -1574,6 +1716,13 @@ export class Game {
     this.gunVolleyTimer = 0;
     this.plasmaTimer = 0;
     this.cloneTimer = 0;
+    this.wingmenTimer = 0;
+    this.phantomFleetTimer = 0;
+    this.escortDronesTimer = 0;
+    this.escortDroneFireCd = 0;
+    for (const key of ["clone", "wingmen", "phantomFleet", "escortDrones"] as PowerUpType[]) {
+      this.timedBuffTimers.delete(key);
+    }
     this.activePowerUp = null;
     this.powerUpTimer = 0;
   }
@@ -1673,7 +1822,9 @@ export class Game {
       this.pendingTokenBoost = 0;
     }
     this.grantTokens(levelTokens);
-    this.handleEggReward(this.eggs.onLevelComplete(this.levelDirector.level));
+    this.handleEggReward(
+      this.eggs.onLevelComplete(this.levelDirector.level, this.levelElapsedSec)
+    );
     if (isBoss) {
       this.handleEggReward(
         this.eggs.onBossDefeat(this.levelDirector.level, enc === "bigBoss")
@@ -1855,16 +2006,34 @@ export class Game {
       this.meta.upgrades.includes("tokenMagnet") || this.magnetBurstActive;
     renderer.drawMagnetAura(this.playerX, this.playerY, magnetActive);
     const ship = this.getShipProfile();
+    const paint = this.getShipPaint();
+    const drawOpts = { accent: paint.accent, cockpit: paint.cockpit };
     renderer.drawPlayer(
       this.playerX,
       this.playerY,
       this.invulnTimer > 0,
-      ship.color,
-      ship.spriteKey
+      paint.primary,
+      ship.spriteKey,
+      drawOpts
     );
-    if (this.cloneTimer > 0) {
-      renderer.drawPlayer(this.playerX - 36, this.playerY, true, ship.color, ship.spriteKey);
-      renderer.drawPlayer(this.playerX + 36, this.playerY, true, ship.color, ship.spriteKey);
+    for (const side of this.getFleetSideOffsets()) {
+      renderer.drawPlayer(
+        this.playerX + side.x,
+        this.playerY,
+        true,
+        paint.primary,
+        ship.spriteKey,
+        { ...drawOpts, ghost: true }
+      );
+    }
+    if (this.escortDronesTimer > 0) {
+      const orbitR = 30;
+      for (let i = 0; i < 2; i++) {
+        const ang = this.escortDronePhase + i * Math.PI;
+        const dx = this.playerX + Math.cos(ang) * orbitR;
+        const dy = this.playerY + Math.sin(ang) * 12;
+        renderer.drawEscortDrone(dx, dy, paint.accent);
+      }
     }
     renderer.drawParticles(particles);
     if (this.shakeTimer > 0) renderer.clearShake();

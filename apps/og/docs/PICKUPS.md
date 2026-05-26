@@ -53,6 +53,9 @@ Weights are per-pickup `weight` in `PICKUP_DEFS` (see `config.ts`). Armory-unloc
 | comboAura | Combo Aura | Combo multiplier floor 2× | until life lost | uncommon | 4 |
 | slow | Time Dilation | Slow enemy march | 3s timed | common | 8 |
 | clone | Ghost Clone | Side clone volleys | 5s timed | uncommon | 5 |
+| wingmen | Wingmen | 2 ghost ships mirror fire (±36px) | 8s timed | uncommon | 4 |
+| phantomFleet | Phantom Fleet | 2 side ships, 0.7× bolt damage | 5s timed | rare | 3 |
+| escortDrones | Escort Drones | 2 orbiters auto-fire weak bolts | 12s timed | uncommon | 4 |
 | clearRow | Row Purge | Destroy bottom alien row | instant | uncommon | 4 |
 | freezeAliens | Stasis Grid | Freeze alien movement | 3s timed | uncommon | 5 |
 | doubleScore | Score Surge | 2× kill score | 10s timed | rare | 4 |
@@ -72,6 +75,19 @@ Weights are per-pickup `weight` in `PICKUP_DEFS` (see `config.ts`). Armory-unloc
 | movement | light blue `#66ccff` |
 
 Toast on pickup: `name — duration` via `pickupToastLine()`. HUD `#hud-buffs` shows active timed buffs and until-life-lost aegis/combo.
+
+### Multi-ship fleet pickups
+
+| Pickup | Side ships | Notes |
+|--------|------------|-------|
+| Ghost Clone | 2 @ ±36px | Stacks under wingmen/phantom cap |
+| Wingmen | 2 @ ±36px | Full damage mirror volleys |
+| Phantom Fleet | 2 @ ±44px | 0.7× damage on side bolts; menu code **FLEET** grants 10s trial |
+| Escort Drones | 0 side ships | Orbiters fire on their own timer (not counted in 3-ship cap) |
+
+**Cap:** `MAX_FLEET_SIDE_SHIPS` = 3 (clone + wingmen + phantom share one offset queue; highest priority: phantom → wingmen → clone).
+
+Clears on life lost or buff timer end.
 
 ### Pickup SFX
 

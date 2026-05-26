@@ -20,10 +20,23 @@ import {
   loadOgMeta,
   recordTokenSpend,
   saveOgMeta,
+  unlockCosmeticColor,
   UPGRADE_COSTS,
   UPGRADE_LABELS,
   type OgMetaUpgrade,
 } from "../progression/metaStore";
+import { EasterEggRegistry } from "../progression/easterEggs";
+import { queuePendingToast } from "../progression/pendingToasts";
+import {
+  COLOR_PALETTE,
+  COLOR_STAR_COST,
+  COSMETIC_COLOR_LABELS,
+  getCosmeticsForHull,
+  normalizeCallsign,
+  resolveShipPaint,
+  type CosmeticColorId,
+  type CockpitTintId,
+} from "../progression/shipCosmetics";
 import { getWeeklyProgressLabel } from "../progression/weeklyChallenges";
 import { ARMORY_GUNS, type ArmoryGunId } from "../progression/armoryGuns";
 import { SHIP_PROFILES, type ShipId } from "../progression/ships";
@@ -355,6 +368,7 @@ export function createGameModesScreen(onBack: () => void): Screen {
 
 export function createArmoryScreen(onBack: () => void): Screen {
   let previewCleanup: (() => void) | undefined;
+  const armoryEggs = new EasterEggRegistry();
 
   return {
     id: "armory",
@@ -413,17 +427,73 @@ export function createArmoryScreen(onBack: () => void): Screen {
           </section>`;
       };
 
+      const getPreviewCosmetics = () => getCosmeticsForHull(meta.shipCosmetics, previewShip);
+
+      const renderColorSwatches = (
+        field: "primary" | "accent" | "cockpit",
+        current: CosmeticColorId | CockpitTintId
+      ): string => {
+        const colors = Object.keys(COLOR_PALETTE) as CosmeticColorId[];
+        const noneOn = current === "none" ? "cosmetic-swatch--on" : "";
+        const noneBtn =
+          field === "cockpit"
+            ? `<button type="button" class="cosmetic-swatch cosmetic-swatch--none ${noneOn}" data-cosmetic-field="${field}" data-cosmetic-color="none" aria-label="No cockpit tint">—</button>`
+            : "";
+        return `${noneBtn}${colors
+          .map((id) => {
+            const unlocked = meta.unlockedCosmeticColors.includes(id);
+            const on = current === id;
+            const lockHint = unlocked ? "" : " (locked)";
+            const hex = COLOR_PALETTE[id];
+            const label = COSMETIC_COLOR_LABELS[id];
+            const swatchStyle = "background:" + hex;
+            const unlockedFlag = unlocked ? "1" : "0";
+            const onCls = on ? "cosmetic-swatch--on" : "";
+            const lockCls = !unlocked ? "cosmetic-swatch--locked" : "";
+            return `<button type="button" class="cosmetic-swatch ${onCls} ${lockCls}"
+              data-cosmetic-field="${field}" data-cosmetic-color="${id}" data-unlocked="${unlockedFlag}"
+              style="${swatchStyle}" aria-label="${label}${lockHint}"></button>`;
+          })
+          .join("")}`;
+      };
+
+      const renderCosmeticsPanel = (): string => {
+        const c = getPreviewCosmetics();
+        const callsign = c.callsign;
+        return `
+          <section class="panel cabinet-panel armory-cosmetics-panel">
+            <h2 class="panel-label">Hull cosmetics <span class="panel-label-sub">◎ palette · ★ unlock colors</span></h2>
+            <label class="armory-callsign-label" for="armory-callsign">Name plate (12 chars)</label>
+            <input id="armory-callsign" class="armory-callsign-input" type="text" maxlength="12" placeholder="CALLSIGN" value="${callsign.replace(/"/g, "&quot;")}" autocomplete="off" />
+            <div class="cosmetic-row">
+              <span class="cosmetic-row-label">Primary</span>
+              <div class="cosmetic-swatches">${renderColorSwatches("primary", c.primary)}</div>
+            </div>
+            <div class="cosmetic-row">
+              <span class="cosmetic-row-label">Engine / accent</span>
+              <div class="cosmetic-swatches">${renderColorSwatches("accent", c.accent)}</div>
+            </div>
+            <div class="cosmetic-row">
+              <span class="cosmetic-row-label">Cockpit tint</span>
+              <div class="cosmetic-swatches">${renderColorSwatches("cockpit", c.cockpitTint)}</div>
+            </div>
+            <p class="armory-hint">Locked colors: ${COLOR_STAR_COST} ★ each in armory, or clear secrets / L12 blitz.</p>
+          </section>`;
+      };
+
       const renderHangarHero = (): string => {
         const s = SHIP_PROFILES[previewShip];
         const owned = meta.unlockedShips.includes(previewShip);
         const equipped = equippedShip === previewShip;
+        const cs = getPreviewCosmetics().callsign;
+        const csHtml = cs ? ` · <span class="hangar-callsign">${cs}</span>` : "";
         return `
           <section class="panel cabinet-panel hangar-hero-panel">
             <h2 class="panel-label">Fighter hangar</h2>
             <div class="hangar-hero">
               <canvas class="hangar-hero-canvas" data-ship-hero width="200" height="120" aria-hidden="true"></canvas>
               <div class="hangar-hero-info">
-                <h3 class="hangar-hero-name">${s.name}</h3>
+                <h3 class="hangar-hero-name">${s.name}${csHtml}</h3>
                 <p class="hangar-hero-tagline">${s.tagline}</p>
                 <p class="hangar-hero-flavor">${s.flavor}</p>
                 <div class="hangar-hero-stats">
@@ -461,10 +531,11 @@ export function createArmoryScreen(onBack: () => void): Screen {
             const selected = previewShip === id;
             const speedPct = Math.round(s.speedMult * 100);
             const firePct = Math.round(s.fireCooldownMult * 100);
+            const paint = resolveShipPaint(getCosmeticsForHull(meta.shipCosmetics, id), s.color, s.accent);
             return `
           <article class="armory-ship-card ${equipped ? "armory-ship-card--equipped" : ""} ${selected ? "armory-ship-card--selected" : ""} ${!owned ? "armory-ship-card--locked" : ""}" data-ship="${id}" data-preview-ship="${id}" role="button" tabindex="0">
             <canvas class="armory-ship-preview" width="56" height="40"
-              data-ship-preview="${s.spriteKey}" data-ship-color="${s.color}" aria-hidden="true"></canvas>
+              data-ship-preview="${s.spriteKey}" data-ship-color="${paint.primary}" aria-hidden="true"></canvas>
             <div class="armory-ship-info">
               <h3 class="armory-ship-name">${s.name}</h3>
               <p class="armory-ship-tag">${s.tagline}</p>
@@ -574,6 +645,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
           </div>
           ${renderCompare()}
           ${renderHangarHero()}
+          ${renderCosmeticsPanel()}
           <section class="panel cabinet-panel">
             <h2 class="panel-label">All hulls</h2>
             <div class="armory-ship-grid">${renderShipCards()}</div>
@@ -596,16 +668,84 @@ export function createArmoryScreen(onBack: () => void): Screen {
         bindEvents();
         mountArmoryShipSprites(root);
         const pvShip = SHIP_PROFILES[previewShip];
-        mountHangarHeroPreview(root, pvShip.spriteKey, pvShip.color);
+        const pvPaint = resolveShipPaint(getPreviewCosmetics(), pvShip.color, pvShip.accent);
+        mountHangarHeroPreview(root, pvShip.spriteKey, pvPaint.primary);
         previewCleanup = mountArmoryGunPreviews(root, {
           selectedGun: previewGun,
           shipSprite: pvShip.spriteKey,
-          shipColor: pvShip.color,
+          shipColor: pvPaint.primary,
         });
+      };
+
+      const saveCosmetics = (patch: Partial<ReturnType<typeof getPreviewCosmetics>>): void => {
+        const cur = getPreviewCosmetics();
+        meta.shipCosmetics[previewShip] = { ...cur, ...patch, hullId: previewShip };
+        saveOgMeta(meta);
+        paint();
       };
 
       const bindEvents = (): void => {
         root.querySelector("[data-back]")?.addEventListener("click", onBack);
+
+        const callsignEl = root.querySelector<HTMLInputElement>("#armory-callsign");
+        const applyCallsign = (): void => {
+          const raw = normalizeCallsign(callsignEl?.value ?? "");
+          if (callsignEl) callsignEl.value = raw;
+          saveCosmetics({ callsign: raw });
+          const s = SHIP_PROFILES[previewShip];
+          const reward = armoryEggs.onTitanCallsign(raw, s.name);
+          if (reward) {
+            queuePendingToast(reward.message);
+            const toast = document.createElement("p");
+            toast.className = "menu-secret-toast menu-secret-toast--visible menu-secret-toast--achievement";
+            toast.textContent = reward.message;
+            root.appendChild(toast);
+            setTimeout(() => toast.remove(), 3600);
+            const hero = root.querySelector<HTMLCanvasElement>("canvas[data-ship-hero]");
+            if (hero) {
+              const ctx = hero.getContext("2d");
+              if (ctx) {
+                const cx = hero.width / 2;
+                const cy = hero.height * 0.4;
+                for (let i = 0; i < 14; i++) {
+                  ctx.fillStyle = "#ffd24a";
+                  ctx.globalAlpha = 0.35;
+                  ctx.fillRect(cx + (Math.random() - 0.5) * 40, cy + (Math.random() - 0.5) * 30, 2, 2);
+                }
+                ctx.globalAlpha = 1;
+              }
+            }
+          }
+        };
+        callsignEl?.addEventListener("change", applyCallsign);
+        callsignEl?.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            applyCallsign();
+          }
+        });
+
+        root.querySelectorAll("[data-cosmetic-field]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const field = (btn as HTMLElement).dataset.cosmeticField as
+              | "primary"
+              | "accent"
+              | "cockpit";
+            const color = (btn as HTMLElement).dataset.cosmeticColor as CosmeticColorId | "none";
+            const unlocked = (btn as HTMLElement).dataset.unlocked === "1";
+            if (color !== "none" && !unlocked) {
+              if (meta.stars < COLOR_STAR_COST) return;
+              meta.stars -= COLOR_STAR_COST;
+              unlockCosmeticColor(meta, color);
+              saveOgMeta(meta);
+            }
+            if (field === "cockpit") {
+              saveCosmetics({ cockpitTint: color as CockpitTintId });
+            } else {
+              saveCosmetics({ [field]: color as CosmeticColorId });
+            }
+          });
+        });
 
         root.querySelectorAll("[data-preview-ship]").forEach((el) => {
           el.addEventListener("click", (e) => {

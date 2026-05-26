@@ -1,6 +1,11 @@
 import type { ArmoryGunId } from "./armoryGuns";
 import { CAMPAIGN_MAX_LEVEL } from "./levelScript";
 import type { ShipId } from "./ships";
+import {
+  DEFAULT_UNLOCKED_COLORS,
+  type CosmeticColorId,
+  type ShipCosmetics,
+} from "./shipCosmetics";
 
 export type OgMetaUpgrade =
   | "extraLife"
@@ -49,6 +54,10 @@ export interface OgMeta {
   lastSeenChallengeState?: ChallengeSeenState;
   /** Consecutive daily ops completion streak. */
   dailyStreak: number;
+  /** Per-hull paint and callsign (keyed by ShipId). */
+  shipCosmetics: Partial<Record<ShipId, ShipCosmetics>>;
+  /** Palette swatches unlocked for armory purchase / secrets. */
+  unlockedCosmeticColors: CosmeticColorId[];
 }
 
 const KEY = "og_meta";
@@ -74,6 +83,8 @@ const DEFAULT: OgMeta = {
   weeklyProgress: {},
   weeklyClaimed: [],
   dailyStreak: 0,
+  shipCosmetics: {},
+  unlockedCosmeticColors: [...DEFAULT_UNLOCKED_COLORS],
 };
 
 export function getWeeklyWeekKey(d = new Date()): string {
@@ -137,7 +148,18 @@ function migrateMeta(m: OgMeta): OgMeta {
   if (!m.weeklyProgress) m.weeklyProgress = {};
   if (!Array.isArray(m.weeklyClaimed)) m.weeklyClaimed = [];
   if (typeof m.dailyStreak !== "number") m.dailyStreak = 0;
+  if (!m.shipCosmetics) m.shipCosmetics = {};
+  if (!Array.isArray(m.unlockedCosmeticColors) || !m.unlockedCosmeticColors.length) {
+    m.unlockedCosmeticColors = [...DEFAULT_UNLOCKED_COLORS];
+  }
   return ensureWeeklyFresh(m);
+}
+
+export function unlockCosmeticColor(meta: OgMeta, color: CosmeticColorId): boolean {
+  if (meta.unlockedCosmeticColors.includes(color)) return false;
+  meta.unlockedCosmeticColors.push(color);
+  saveOgMeta(meta);
+  return true;
 }
 
 export function saveOgMeta(m: OgMeta): void {
