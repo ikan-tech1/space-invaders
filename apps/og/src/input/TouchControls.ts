@@ -126,7 +126,7 @@ export class TouchControls {
   }
 
   private setMoveActive(active: boolean): void {
-    this.moveEl.classList.toggle("touch-move--active", active);
+    this.moveEl.classList.toggle("touch-active", active);
   }
 
   private updateAxis(clientX: number): void {
