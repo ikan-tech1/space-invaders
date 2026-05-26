@@ -103,8 +103,8 @@ export const ALIEN_DROP_CHANCE: Record<Difficulty, number> = {
 /** Extra drop chance in endless mode. */
 export const ENDLESS_DROP_BONUS = 0.02;
 
-/** ~8% of successful rolls pick from the cursed pool. */
-export const CURSED_DROP_FRACTION = 0.08;
+/** ~7% of successful rolls pick from the cursed pool. */
+export const CURSED_DROP_FRACTION = 0.07;
 
 export const MAX_PICKUPS_ON_SCREEN = 4;
 

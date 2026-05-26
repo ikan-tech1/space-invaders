@@ -12,6 +12,7 @@ import {
   createHowToPlayScreen,
   createSettingsScreen,
 } from "./screens/SubScreens";
+import { showSplashIfNeeded } from "./ui/splashScreen";
 
 const repo = new LocalStorageRepo();
 let difficulty: Difficulty = "classic";
@@ -66,7 +67,7 @@ function startGame(continueRun: boolean, mode: GameMode): void {
   gameScreen.start();
 }
 
-showMenu();
+showSplashIfNeeded(showMenu);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

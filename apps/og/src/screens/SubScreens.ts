@@ -216,30 +216,35 @@ export function createArmoryScreen(onBack: () => void): Screen {
         const pvGunStats = getGunCompareStats(previewGun);
         const shipDiff = (a: number, b: number, inv = false) => {
           const d = b - a;
-          if (d === 0) return "—";
+          if (d === 0) return "";
           const good = inv ? d < 0 : d > 0;
-          return `<span class="compare-delta ${good ? "compare-delta--good" : "compare-delta--bad"}">${d > 0 ? "+" : ""}${Math.round(d * (inv ? 100 : 100))}${inv ? "% fire" : "% spd"}</span>`;
+          const pct = Math.round(Math.abs(d) * 100);
+          return `<span class="compare-chip compare-chip--${good ? "good" : "bad"}">${d > 0 ? "+" : "−"}${pct}%</span>`;
         };
+        const statChip = (label: string, eq: string, pv: string, delta = "") =>
+          `<span class="armory-stat-chip"><span class="armory-stat-chip-label">${label}</span><span class="armory-stat-chip-eq">${eq}</span><span class="armory-stat-chip-arrow">→</span><span class="armory-stat-chip-pv">${pv}</span>${delta}</span>`;
         return `
           <section class="panel cabinet-panel armory-compare" data-compare-panel>
             <h2 class="panel-label">Loadout compare</h2>
-            <div class="armory-compare-grid">
-              <div class="armory-compare-col">
+            <div class="armory-compare-chips">
+              <div class="armory-compare-chip armory-compare-chip--equipped">
                 <span class="armory-compare-tag">Equipped</span>
                 <strong>${eqShip.name}</strong>
-                <span class="armory-compare-stat">Spd ${Math.round(eqShip.speedMult * 100)}% · Fire ${Math.round(eqShip.fireCooldownMult * 100)}% · Hull ${Math.round(eqShip.hitboxScale * 100)}%</span>
-                <strong class="armory-compare-gun">${GUN_VOLLEY_LABELS[equippedGun]}</strong>
-                <span class="armory-compare-stat">${eqGunStats.volleySize} bolts · ${eqGunStats.cooldownTier} · ${eqGunStats.bypassSlot ? "Multi-slot" : "Classic slot"}</span>
+                <span class="armory-compare-gun">${GUN_VOLLEY_LABELS[equippedGun]}</span>
               </div>
-              <div class="armory-compare-vs">vs</div>
-              <div class="armory-compare-col armory-compare-col--preview">
+              <span class="armory-compare-vs">vs</span>
+              <div class="armory-compare-chip armory-compare-chip--preview">
                 <span class="armory-compare-tag">Preview</span>
                 <strong>${pvShip.name}</strong>
-                <span class="armory-compare-stat">Spd ${Math.round(pvShip.speedMult * 100)}% ${previewShip !== equippedShip ? shipDiff(eqShip.speedMult, pvShip.speedMult) : ""}</span>
-                <span class="armory-compare-stat">Fire ${Math.round(pvShip.fireCooldownMult * 100)}% ${previewShip !== equippedShip ? shipDiff(eqShip.fireCooldownMult, pvShip.fireCooldownMult, true) : ""}</span>
-                <strong class="armory-compare-gun">${GUN_VOLLEY_LABELS[previewGun]}</strong>
-                <span class="armory-compare-stat">${pvGunStats.volleySize} bolts · ${pvGunStats.cooldownTier} · ${pvGunStats.bypassSlot ? "Multi-slot" : "Classic slot"}</span>
+                <span class="armory-compare-gun">${GUN_VOLLEY_LABELS[previewGun]}</span>
               </div>
+            </div>
+            <div class="armory-stat-chips">
+              ${statChip("Speed", `${Math.round(eqShip.speedMult * 100)}%`, `${Math.round(pvShip.speedMult * 100)}%`, previewShip !== equippedShip ? shipDiff(eqShip.speedMult, pvShip.speedMult) : "")}
+              ${statChip("Fire", `${Math.round(eqShip.fireCooldownMult * 100)}%`, `${Math.round(pvShip.fireCooldownMult * 100)}%`, previewShip !== equippedShip ? shipDiff(eqShip.fireCooldownMult, pvShip.fireCooldownMult, true) : "")}
+              ${statChip("Hull", `${Math.round(eqShip.hitboxScale * 100)}%`, `${Math.round(pvShip.hitboxScale * 100)}%`, previewShip !== equippedShip ? shipDiff(eqShip.hitboxScale, pvShip.hitboxScale, true) : "")}
+              ${statChip("Volley", `${eqGunStats.volleySize}`, `${pvGunStats.volleySize}`, previewGun !== equippedGun && pvGunStats.volleySize !== eqGunStats.volleySize ? `<span class="compare-chip compare-chip--good">+${pvGunStats.volleySize - eqGunStats.volleySize}</span>` : "")}
+              ${statChip("Tier", eqGunStats.cooldownTier, pvGunStats.cooldownTier)}
             </div>
             <p class="armory-compare-hint">Tap a ship or gun card to preview stats before equipping.</p>
           </section>`;

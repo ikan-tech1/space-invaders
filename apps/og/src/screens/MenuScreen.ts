@@ -94,6 +94,26 @@ export class MenuScreen implements Screen {
             <div class="arcade-marquee" aria-hidden="true">
               <span>1 CREDIT · INSERT COIN</span>
             </div>
+            <div class="menu-cabinet-meta">
+              <div class="menu-stat-ring" aria-label="Challenge progress ${badgeCount} of ${challengeTotal}">
+                <svg viewBox="0 0 64 64" class="menu-stat-ring-svg" aria-hidden="true">
+                  <circle class="menu-stat-ring-track" cx="32" cy="32" r="28" fill="none" stroke-width="4"/>
+                  <circle class="menu-stat-ring-fill" cx="32" cy="32" r="28" fill="none" stroke-width="4"
+                    stroke-dasharray="${(2 * Math.PI * 28).toFixed(1)}"
+                    stroke-dashoffset="${(2 * Math.PI * 28 * (1 - badgeCount / Math.max(challengeTotal, 1))).toFixed(1)}"/>
+                </svg>
+                <span class="menu-stat-ring-value">${Math.round((badgeCount / Math.max(challengeTotal, 1)) * 100)}%</span>
+                <span class="menu-stat-ring-label">Badges</span>
+              </div>
+              <div class="menu-credit-counter" aria-label="Arcade credits">
+                <span class="menu-credit-slot" aria-hidden="true"></span>
+                <div class="menu-credit-body">
+                  <span class="menu-credit-label">Credits</span>
+                  <span class="menu-credit-value">1</span>
+                  <span class="menu-credit-bank">Bank ◎ ${meta.tokens}</span>
+                </div>
+              </div>
+            </div>
             <div class="arcade-stats">
               <span class="arcade-stat">
                 <span class="arcade-stat-label">Tokens</span>

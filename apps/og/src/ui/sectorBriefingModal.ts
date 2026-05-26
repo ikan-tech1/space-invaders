@@ -63,12 +63,19 @@ function encounterMeta(encounter: EncounterType): { label: string; icon: string;
   ];
 }
 
+function encounterBadge(encounter: EncounterType): { label: string; mod: string } {
+  if (encounter === "miniBoss") return { label: "Mini Boss", mod: "sb-badge--encounter-miniBoss" };
+  if (encounter === "bigBoss") return { label: "Boss", mod: "sb-badge--encounter-bigBoss" };
+  return { label: "Wave", mod: "sb-badge--encounter-wave" };
+}
+
 export function showSectorBriefingModal(
   root: HTMLElement,
   briefing: SectorBriefing,
   onDismiss: () => void
 ): void {
   const encounter = getEncounterType(briefing.level);
+  const encBadge = encounterBadge(encounter);
   const threatMod = threatClass(briefing.threat);
   const meterPct = threatMeterPct(briefing.threat);
   const encounters = encounterMeta(encounter)
@@ -83,7 +90,7 @@ export function showSectorBriefingModal(
 
   root.classList.remove("hidden");
   root.innerHTML = `
-    <div class="sector-briefing-panel arcade-cabinet arcade-cabinet--modal">
+    <div class="sector-briefing-panel sector-briefing-panel--intro arcade-cabinet arcade-cabinet--modal">
       <div class="arcade-frame" aria-hidden="true">
         <span class="arcade-corner arcade-corner-tl"></span>
         <span class="arcade-corner arcade-corner-tr"></span>
@@ -102,7 +109,9 @@ export function showSectorBriefingModal(
         <div class="sector-briefing-badges" role="list" aria-label="Mission metadata">
           <span class="sb-badge sb-badge--level" role="listitem">LV ${briefing.level}</span>
           <span class="sb-badge sb-badge--sector" role="listitem">SEC ${sectorRoman(briefing.sector)}</span>
+          <span class="sb-badge sb-badge--encounter ${encBadge.mod}" role="listitem">${encBadge.label}</span>
           <span class="sb-badge sb-badge--threat ${threatMod}" role="listitem">${briefing.threat}</span>
+          <span class="sb-badge sb-badge--encounter sb-badge--encounter-${encounter}" role="listitem">${encounter === "bigBoss" ? "BOSS" : encounter === "miniBoss" ? "MINI" : "WAVE"}</span>
         </div>
         <div class="sector-briefing-threat-meter" aria-label="Threat level ${briefing.threat}">
           <div class="sb-threat-meter-head">
@@ -155,6 +164,12 @@ export function showSectorBriefingModal(
   };
 
   root.querySelector(".sector-briefing-go")?.addEventListener("click", dismiss, { once: true });
+
+  const panel = root.querySelector(".sector-briefing-panel");
+  requestAnimationFrame(() => {
+    panel?.classList.remove("sector-briefing-panel--intro");
+    panel?.classList.add("sector-briefing-panel--visible");
+  });
 
   const onKey = (e: KeyboardEvent): void => {
     if (e.key === "Enter" || e.key === " ") {
