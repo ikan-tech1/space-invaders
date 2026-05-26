@@ -1,7 +1,6 @@
 import type { Difficulty, GameMode } from "../config";
 import { OG_CHALLENGES } from "../progression/challenges";
 import {
-  getDailyChallenge,
   getDailyDateKey,
   loadDailyCompletedDate,
 } from "../progression/dailyChallenges";
@@ -18,7 +17,7 @@ export interface MenuScreenDeps {
   difficulty: Difficulty;
   onDifficultyChange: (d: Difficulty) => void;
   onPlay: (continueRun: boolean, mode: GameMode) => void;
-  onNavigate: (screen: "settings" | "highScores" | "howToPlay" | "challenges" | "armory") => void;
+  onNavigate: (screen: "settings" | "highScores" | "howToPlay" | "challenges" | "dailyOps" | "gameModes" | "armory") => void;
   onCampaign: () => void;
 }
 
@@ -40,7 +39,6 @@ export class MenuScreen implements Screen {
     const meta = loadOgMeta();
     const badgeCount = meta.badges.length;
     const challengeTotal = OG_CHALLENGES.length;
-    const daily = getDailyChallenge();
     const dailyDone = loadDailyCompletedDate() === getDailyDateKey();
     const endlessTier = getEndlessTier(meta.endlessBestDepth ?? 0);
     const endlessSub =
@@ -208,17 +206,22 @@ export class MenuScreen implements Screen {
           <button type="button" class="nav-tile nav-tile-daily ${dailyDone ? "nav-tile-daily--done" : ""}" data-action="daily">
             <span class="nav-tile-icon">☀</span>
             <span class="nav-tile-label">Daily</span>
-            <span class="nav-tile-meta">${dailyDone ? "Done" : `+${daily.tokenReward} ◎`}</span>
+            <span class="nav-tile-meta">${dailyDone ? "Done" : "Daily Ops"}</span>
           </button>
           <button type="button" class="nav-tile" data-action="armory">
             <span class="nav-tile-icon">⚔</span>
             <span class="nav-tile-label">Armory</span>
-            <span class="nav-tile-meta">◎ ${meta.tokens}</span>
+            <span class="nav-tile-meta">${SHIP_PROFILES[meta.equippedShip].name}</span>
           </button>
           <button type="button" class="nav-tile" data-action="challenges">
             <span class="nav-tile-icon">◎</span>
             <span class="nav-tile-label">Challenges</span>
             <span class="nav-tile-meta">${badgeCount}/${challengeTotal}</span>
+          </button>
+          <button type="button" class="nav-tile nav-tile-modes" data-action="modes">
+            <span class="nav-tile-icon">▦</span>
+            <span class="nav-tile-label">Modes</span>
+            <span class="nav-tile-meta">Soon</span>
           </button>
           <button type="button" class="nav-tile" data-action="highscores">
             <span class="nav-tile-icon">★</span>
@@ -254,13 +257,16 @@ export class MenuScreen implements Screen {
       this.deps.onPlay(true, "campaign");
     });
     root.querySelector('[data-action="daily"]')?.addEventListener("click", () => {
-      this.deps.onNavigate("challenges");
+      this.deps.onNavigate("dailyOps");
     });
     root.querySelector('[data-action="armory"]')?.addEventListener("click", () => {
       this.deps.onNavigate("armory");
     });
     root.querySelector('[data-action="challenges"]')?.addEventListener("click", () => {
       this.deps.onNavigate("challenges");
+    });
+    root.querySelector('[data-action="modes"]')?.addEventListener("click", () => {
+      this.deps.onNavigate("gameModes");
     });
     root.querySelector('[data-action="highscores"]')?.addEventListener("click", () => {
       this.deps.onNavigate("highScores");

@@ -1,5 +1,6 @@
 import type { AudioManager } from "../audio/AudioManager";
 import { mountSlotSymbolCanvases } from "./slotSymbolSprites";
+import type { FocusTrapHandle } from "./focusTrap";
 import {
   PICKUP_DEFS,
   POWERUP_LABELS,
@@ -229,7 +230,7 @@ export function showSlotMachine(
 
   root.classList.remove("hidden");
   root.innerHTML = `
-    <div class="slot-machine-panel arcade-cabinet arcade-cabinet--modal">
+    <div class="slot-machine-panel arcade-cabinet arcade-cabinet--modal" role="dialog" aria-modal="true" aria-labelledby="slot-title">
       <div class="arcade-frame" aria-hidden="true">
         <span class="arcade-corner arcade-corner-tl"></span>
         <span class="arcade-corner arcade-corner-tr"></span>
@@ -243,7 +244,7 @@ export function showSlotMachine(
           <span class="arcade-status-dot arcade-status-dot--danger"></span>
           LAST CHANCE
         </p>
-        <h2 class="slot-title">Lucky Reels</h2>
+        <h2 class="slot-title" id="slot-title">Lucky Reels</h2>
         <p class="slot-subtitle">One spin — life, power-up, shields, tokens, or second wind</p>
       </div>
       <div class="slot-machine-body">
@@ -266,7 +267,7 @@ export function showSlotMachine(
         <p class="slot-result hidden" id="slot-result"></p>
         <p class="slot-result-detail hidden" id="slot-result-detail"></p>
       </div>
-      <footer class="slot-machine-footer">
+      <footer class="slot-machine-footer cabinet-footer">
         <div class="screen-marquee slot-marquee" aria-hidden="true">
           <span>♥ LIFE · ✦ POWER · ◆ SHIELDS · ◎ TOKENS · ☼ WIND</span>
         </div>
@@ -291,10 +292,13 @@ export function showSlotMachine(
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let spinning = false;
   let finished = false;
+  let focusTrap: FocusTrapHandle | null = null;
 
   const finish = (): void => {
     if (finished) return;
     finished = true;
+    focusTrap?.release();
+    focusTrap = null;
     root.classList.add("hidden");
     root.innerHTML = "";
     onComplete(outcome);

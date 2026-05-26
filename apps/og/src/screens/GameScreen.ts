@@ -9,7 +9,8 @@ import { showLevelCompleteModal } from "../ui/levelCompleteModal";
 import { showSectorBriefingModal } from "../ui/sectorBriefingModal";
 import { getSectorBriefing } from "../progression/sectorBriefings";
 import { showSlotMachine } from "../ui/slotMachine";
-import { styleWaveBanner } from "../ui/cabinetShell";
+import { ARCADE_FRAME, styleWaveBanner } from "../ui/cabinetShell";
+import { trapFocus, type FocusTrapHandle } from "../ui/focusTrap";
 
 export interface GameScreenDeps {
   repo: LocalStorageRepo;
@@ -32,6 +33,7 @@ export class GameScreen {
   private levelModal: HTMLElement;
   private slotOverlay: HTMLElement;
   private briefingModal: HTMLElement;
+  private pauseFocusTrap: FocusTrapHandle | null = null;
 
   constructor(private deps: GameScreenDeps) {
     this.canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
@@ -156,6 +158,22 @@ export class GameScreen {
       onToast: showToast,
       onPauseChange: (paused) => {
         pauseOverlay.classList.toggle("hidden", !paused);
+        if (paused) {
+          const shell = pauseOverlay.querySelector<HTMLElement>(".pause-cabinet");
+          const resumeBtn = document.getElementById("pause-resume");
+          pauseOverlay.setAttribute("role", "dialog");
+          pauseOverlay.setAttribute("aria-modal", "true");
+          pauseOverlay.setAttribute("aria-labelledby", "pause-title");
+          this.pauseFocusTrap?.release();
+          if (shell) {
+            this.pauseFocusTrap = trapFocus(shell, {
+              initial: resumeBtn,
+            });
+          }
+        } else {
+          this.pauseFocusTrap?.release();
+          this.pauseFocusTrap = null;
+        }
       },
       onCampaignClear: () => {
         waveBanner.textContent = "CAMPAIGN CLEARED!";
@@ -285,15 +303,30 @@ export class GameScreen {
     localStorage.setItem("og_onboarding_seen", "1");
     const tip = document.createElement("div");
     tip.className = "onboarding-tip";
+    tip.setAttribute("role", "dialog");
+    tip.setAttribute("aria-modal", "true");
+    tip.setAttribute("aria-labelledby", "onboarding-title");
     tip.innerHTML = `
-      <p class="onboarding-tip-title">Quick briefing</p>
-      <p>Move with <kbd>←</kbd> <kbd>→</kbd> or drag the zone. Tap <strong>FIRE</strong> or press <kbd>Space</kbd>.</p>
-      <p>Chain kills for combos. On your <strong>last life</strong>, <strong>Lucky Reels</strong> offers a last-chance spin.</p>
-      <button type="button" class="btn btn-primary onboarding-dismiss">Got it</button>
+      <div class="onboarding-cabinet arcade-cabinet arcade-cabinet--modal">
+        ${ARCADE_FRAME}
+        <div class="onboarding-body">
+          <p class="cabinet-mini-status onboarding-status">
+            <span class="arcade-status-dot"></span> OPERATOR BRIEF
+          </p>
+          <p class="onboarding-tip-title" id="onboarding-title">Quick briefing</p>
+          <p>Move with <kbd>←</kbd> <kbd>→</kbd> or drag the zone. Tap <strong>FIRE</strong> or press <kbd>Space</kbd>.</p>
+          <p>Chain kills for combos. On your <strong>last life</strong>, <strong>Lucky Reels</strong> offers a last-chance spin.</p>
+        </div>
+        <footer class="onboarding-footer cabinet-footer">
+          <button type="button" class="btn btn-primary onboarding-dismiss">Got it</button>
+        </footer>
+      </div>
     `;
     this.gameLayer.appendChild(tip);
     const dismiss = (): void => tip.remove();
-    tip.querySelector(".onboarding-dismiss")?.addEventListener("click", dismiss, { once: true });
+    const dismissBtn = tip.querySelector<HTMLButtonElement>(".onboarding-dismiss");
+    dismissBtn?.addEventListener("click", dismiss, { once: true });
+    dismissBtn?.focus();
     window.setTimeout(dismiss, 12000);
   }
 
@@ -313,6 +346,8 @@ export class GameScreen {
   }
 
   stop(): void {
+    this.pauseFocusTrap?.release();
+    this.pauseFocusTrap = null;
     this.loop?.stop();
     this.loop = null;
     this.input?.destroy();

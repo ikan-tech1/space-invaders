@@ -6,24 +6,35 @@ import {
   renderSubCabinetShell,
   renderSubHeader,
 } from "../ui/cabinetShell";
-import { OG_CHALLENGES } from "../progression/challenges";
+import { OG_CHALLENGES, WEEKLY_CHALLENGES } from "../progression/challenges";
+import { getPendingCelebrations } from "../progression/challengeState";
 import {
-  getDailyChallenge,
+  formatCountdown,
   getDailyDateKey,
+  getDailyTasks,
   loadDailyCompletedDate,
+  loadDailyStreak,
+  msUntilMidnight,
 } from "../progression/dailyChallenges";
 import {
   loadOgMeta,
+  recordTokenSpend,
   saveOgMeta,
   UPGRADE_COSTS,
   UPGRADE_LABELS,
   type OgMetaUpgrade,
 } from "../progression/metaStore";
+import { getWeeklyProgressLabel } from "../progression/weeklyChallenges";
 import { ARMORY_GUNS, type ArmoryGunId } from "../progression/armoryGuns";
 import { SHIP_PROFILES, type ShipId } from "../progression/ships";
 import { GUN_VOLLEY_LABELS, getGunCompareStats } from "../game/weaponVolley";
 import { POWERUP_LABELS, type PowerUpType } from "../config";
-import { mountArmoryGunPreviews, mountArmoryShipSprites } from "../ui/armoryGunPreview";
+import {
+  mountArmoryGunPreviews,
+  mountArmoryShipSprites,
+  mountHangarHeroPreview,
+} from "../ui/armoryGunPreview";
+import { runChallengeCelebrations } from "../ui/challengeCelebration";
 
 export function createSettingsScreen(
   repo: LocalStorageRepo,
@@ -137,51 +148,202 @@ export function createHowToPlayScreen(onBack: () => void): Screen {
   };
 }
 
+function renderChallengeRow(
+  c: (typeof OG_CHALLENGES)[number] | (typeof WEEKLY_CHALLENGES)[number],
+  done: boolean,
+  extra = ""
+): string {
+  const scope = c.scope === "weekly" ? "Weekly" : "Campaign";
+  const rewardBits: string[] = [];
+  if (!done && c.starReward) rewardBits.push(`+${c.starReward} ★`);
+  if (!done && c.tokenReward) rewardBits.push(`+${c.tokenReward} ◎`);
+  const rewardTag = done
+    ? '<span class="challenge-badge">Complete</span>'
+    : rewardBits.length
+      ? `<span class="challenge-stars">${rewardBits.join(" · ")}</span>`
+      : "";
+  return `
+    <li class="challenge-item ${done ? "challenge-item--done" : "challenge-item--pending"}" data-challenge-id="${c.id}">
+      <span class="challenge-item-icon" aria-hidden="true">${done ? "✓" : "○"}</span>
+      <div class="challenge-item-body">
+        <div class="challenge-header">
+          <strong>${c.title}</strong>
+          <span class="challenge-scope-tag challenge-scope-tag--${c.scope}">${scope}</span>
+          ${rewardTag}
+        </div>
+        <p class="challenge-desc">${c.description}</p>
+        <span class="challenge-reward">${c.reward}${extra ? ` · ${extra}` : ""}</span>
+      </div>
+    </li>`;
+}
+
+export function createDailyOpsScreen(onBack: () => void): Screen {
+  return {
+    id: "dailyOps",
+    mount(root) {
+      const meta = loadOgMeta();
+      const tasks = getDailyTasks();
+      const dailyDone = loadDailyCompletedDate() === getDailyDateKey();
+      const streak = loadDailyStreak() || meta.dailyStreak;
+      const countdown = formatCountdown(msUntilMidnight());
+      const taskRows = tasks
+        .map(
+          (t) => `
+        <li class="daily-ops-task ${dailyDone ? "daily-ops-task--done" : ""}" data-daily-id="${t.id}">
+          <span class="daily-ops-task-icon" aria-hidden="true">${dailyDone ? "✓" : "◎"}</span>
+          <div class="daily-ops-task-body">
+            <strong>${t.title}</strong>
+            <p>${t.description}</p>
+            <span class="daily-ops-task-reward">+${t.tokenReward} ◎</span>
+          </div>
+        </li>`
+        )
+        .join("");
+
+      root.innerHTML = renderSubCabinetShell({
+        screenClass: "daily-ops-screen",
+        shellClass: "sub-cabinet-shell--daily",
+        headerHtml: renderSubHeader(
+          "Daily Ops",
+          dailyDone ? "Today's bundle complete" : "Complete any task in one run",
+          "— DAILY BRIEF —"
+        ),
+        bodyHtml: `
+          <section class="panel cabinet-panel daily-ops-hero">
+            <div class="daily-ops-stats">
+              <div class="daily-ops-stat">
+                <span class="daily-ops-stat-label">Streak</span>
+                <strong class="daily-ops-stat-value">${streak} day${streak === 1 ? "" : "s"}</strong>
+              </div>
+              <div class="daily-ops-stat">
+                <span class="daily-ops-stat-label">Resets in</span>
+                <strong class="daily-ops-stat-value daily-ops-countdown" data-countdown>${countdown}</strong>
+              </div>
+              <div class="daily-ops-stat">
+                <span class="daily-ops-stat-label">Reward</span>
+                <strong class="daily-ops-stat-value">+${tasks.reduce((s, t) => s + t.tokenReward, 0)} ◎</strong>
+              </div>
+            </div>
+            ${dailyDone ? '<p class="daily-ops-complete-banner">All ops complete — see you at midnight</p>' : ""}
+          </section>
+          <section class="panel cabinet-panel">
+            <h2 class="panel-label">Today's objectives</h2>
+            <ul class="daily-ops-list">${taskRows}</ul>
+            <p class="daily-challenge-hint">Finish any objective during a run · Resets at local midnight</p>
+          </section>
+          <section class="panel cabinet-panel daily-ops-tip">
+            <p class="challenge-star-note">Daily Ops is separate from the trophy board. Campaign &amp; weekly badges live under Challenges.</p>
+          </section>`,
+        footerHtml: renderSubBackFooter(),
+      });
+
+      root.querySelector("[data-back]")?.addEventListener("click", onBack);
+
+      const countdownEl = root.querySelector<HTMLElement>("[data-countdown]");
+      const tick = (): void => {
+        if (!countdownEl?.isConnected) return;
+        countdownEl.textContent = formatCountdown(msUntilMidnight());
+        window.setTimeout(tick, 1000);
+      };
+      tick();
+
+      const pending = getPendingCelebrations("daily");
+      const nextPending = dailyDone ? undefined : tasks[0];
+      runChallengeCelebrations(
+        root,
+        pending,
+        nextPending ? `[data-daily-id="${nextPending.id}"]` : undefined
+      );
+    },
+    unmount() {},
+  };
+}
+
 export function createChallengesScreen(onBack: () => void): Screen {
   return {
     id: "challenges",
     mount(root) {
       const meta = loadOgMeta();
-      const daily = getDailyChallenge();
-      const dailyDone = loadDailyCompletedDate() === getDailyDateKey();
-      const rows = OG_CHALLENGES.map(
-        (c) => {
-          const done = meta.badges.includes(c.id);
-          return `
-        <li class="challenge-item ${done ? "challenge-item--done" : "challenge-item--pending"}">
-          <span class="challenge-item-icon" aria-hidden="true">${done ? "✓" : "○"}</span>
-          <div class="challenge-item-body">
-            <div class="challenge-header">
-              <strong>${c.title}</strong>
-              ${done ? '<span class="challenge-badge">Complete</span>' : `<span class="challenge-stars">+${c.starReward} ★</span>`}
-            </div>
-            <p class="challenge-desc">${c.description}</p>
-            <span class="challenge-reward">${c.reward}</span>
-          </div>
-        </li>`;
-        }
-      ).join("");
+      const campaignRows = OG_CHALLENGES.map((c) => {
+        const done = meta.badges.includes(c.id);
+        return renderChallengeRow(c, done);
+      }).join("");
+      const weeklyRows = WEEKLY_CHALLENGES.map((c) => {
+        const done = meta.weeklyClaimed.includes(c.id);
+        const progress = done ? "" : getWeeklyProgressLabel(c.id);
+        return renderChallengeRow(c, done, progress);
+      }).join("");
+      const doneCampaign = meta.badges.length;
+      const doneWeekly = meta.weeklyClaimed.length;
+
       root.innerHTML = renderSubCabinetShell({
+        screenClass: "challenges-screen",
         headerHtml: renderSubHeader(
           "Challenges",
-          `${meta.badges.length} / ${OG_CHALLENGES.length} cleared · ★ ${meta.stars} banked`,
-          "— ACHIEVEMENTS —"
+          `${doneCampaign} campaign · ${doneWeekly} weekly · ★ ${meta.stars} banked`,
+          "— TROPHY BOARD —"
         ),
         bodyHtml: `
-          <section class="panel cabinet-panel daily-challenge-panel">
-            <h2 class="panel-label">Daily challenge</h2>
-            <div class="daily-challenge-card ${dailyDone ? "daily-challenge-card--done" : ""}">
-              <div class="daily-challenge-head">
-                <strong>${daily.title}</strong>
-                ${dailyDone ? '<span class="challenge-badge">Complete</span>' : `<span class="challenge-stars">+${daily.tokenReward} ◎</span>`}
-              </div>
-              <p class="challenge-desc">${daily.description}</p>
-              <p class="daily-challenge-hint">Resets at midnight · Complete in one run</p>
-            </div>
+          <section class="panel cabinet-panel">
+            <h2 class="panel-label">Weekly ops <span class="panel-label-sub">Resets Monday</span></h2>
+            <ul class="challenge-list">${weeklyRows}</ul>
           </section>
-          <p class="challenge-star-note">Complete challenges to earn stars for Armory upgrades.</p>
+          <p class="challenge-star-note">Weekly progress accumulates across runs this week.</p>
           <section class="panel cabinet-panel panel-flush">
-            <ul class="challenge-list">${rows}</ul>
+            <h2 class="panel-label">Campaign badges <span class="panel-label-sub">${doneCampaign}/${OG_CHALLENGES.length}</span></h2>
+            <ul class="challenge-list">${campaignRows}</ul>
+          </section>
+          <p class="challenge-star-note">Complete badges to earn ★ for Armory upgrades and unlock pickups.</p>`,
+        footerHtml: renderSubBackFooter(),
+      });
+      root.querySelector("[data-back]")?.addEventListener("click", onBack);
+
+      const pending = getPendingCelebrations("challenges");
+      const nextCampaign = OG_CHALLENGES.find((c) => !meta.badges.includes(c.id));
+      runChallengeCelebrations(
+        root,
+        pending,
+        nextCampaign ? `[data-challenge-id="${nextCampaign.id}"]` : undefined
+      );
+    },
+    unmount() {},
+  };
+}
+
+const GAME_MODE_TILES = [
+  { id: "survival", name: "Survival+", icon: "∞" },
+  { id: "boss_rush", name: "Boss Rush", icon: "☠" },
+  { id: "pacifist", name: "Pacifist", icon: "◎" },
+  { id: "token_rush", name: "Token Rush", icon: "◎◎" },
+  { id: "coop", name: "Co-op", icon: "👥" },
+  { id: "mirror", name: "Mirror", icon: "⇄" },
+  { id: "nightmare", name: "Nightmare", icon: "☽" },
+  { id: "time_attack", name: "Time Attack", icon: "⏱" },
+  { id: "gauntlet", name: "Gauntlet", icon: "⚔" },
+  { id: "daily_gauntlet", name: "Daily Gauntlet", icon: "☀" },
+];
+
+export function createGameModesScreen(onBack: () => void): Screen {
+  return {
+    id: "gameModes",
+    mount(root) {
+      const tiles = GAME_MODE_TILES.map(
+        (m) => `
+        <button type="button" class="modes-tile modes-tile--locked" data-mode="${m.id}" disabled>
+          <span class="modes-tile-lock" aria-hidden="true">🔒</span>
+          <span class="modes-tile-icon">${m.icon}</span>
+          <span class="modes-tile-label">${m.name}</span>
+          <span class="modes-tile-meta">Coming soon</span>
+        </button>`
+      ).join("");
+
+      root.innerHTML = renderSubCabinetShell({
+        screenClass: "game-modes-screen",
+        headerHtml: renderSubHeader("Game Modes", "Alternate rulesets · build one by one", "— COMING SOON —"),
+        bodyHtml: `
+          <section class="panel cabinet-panel">
+            <p class="modes-intro">Locked modes are planned in <code>docs/GAME_MODES.md</code>. Campaign &amp; Endless remain the live ways to play.</p>
+            <div class="modes-grid">${tiles}</div>
           </section>`,
         footerHtml: renderSubBackFooter(),
       });
@@ -251,8 +413,47 @@ export function createArmoryScreen(onBack: () => void): Screen {
           </section>`;
       };
 
-      const renderShipCards = (): string =>
-        (Object.keys(SHIP_PROFILES) as ShipId[])
+      const renderHangarHero = (): string => {
+        const s = SHIP_PROFILES[previewShip];
+        const owned = meta.unlockedShips.includes(previewShip);
+        const equipped = equippedShip === previewShip;
+        return `
+          <section class="panel cabinet-panel hangar-hero-panel">
+            <h2 class="panel-label">Fighter hangar</h2>
+            <div class="hangar-hero">
+              <canvas class="hangar-hero-canvas" data-ship-hero width="200" height="120" aria-hidden="true"></canvas>
+              <div class="hangar-hero-info">
+                <h3 class="hangar-hero-name">${s.name}</h3>
+                <p class="hangar-hero-tagline">${s.tagline}</p>
+                <p class="hangar-hero-flavor">${s.flavor}</p>
+                <div class="hangar-hero-stats">
+                  <span>Speed ${Math.round(s.speedMult * 100)}%</span>
+                  <span>Fire ${Math.round(s.fireCooldownMult * 100)}%</span>
+                  <span>Hull ${Math.round(s.hitboxScale * 100)}%</span>
+                </div>
+                <div class="hangar-hero-passive">
+                  <span class="hangar-hero-passive-label">${s.passiveLabel}</span>
+                  <span class="hangar-hero-passive-desc">${s.passiveDesc}</span>
+                </div>
+                <div class="hangar-hero-actions">
+                  ${
+                    equipped
+                      ? '<span class="armory-equipped-badge hangar-equipped-badge">Selected for next run</span>'
+                      : owned
+                        ? `<button type="button" class="btn btn-primary hangar-select-btn" data-equip-ship="${previewShip}">Select ship</button>`
+                        : `<button type="button" class="btn btn-primary btn-token hangar-select-btn" data-buy-ship="${previewShip}" ${meta.tokens < s.tokenCost ? "disabled" : ""}>
+                            Unlock &amp; select · ${s.tokenCost === 0 ? "Free" : `${s.tokenCost} ◎`}
+                          </button>`
+                  }
+                </div>
+              </div>
+            </div>
+          </section>`;
+      };
+
+      const renderShipCards = (): string => {
+        const shipIds = Object.keys(SHIP_PROFILES) as ShipId[];
+        const cards = shipIds
           .map((id) => {
             const s = SHIP_PROFILES[id];
             const owned = meta.unlockedShips.includes(id);
@@ -261,7 +462,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
             const speedPct = Math.round(s.speedMult * 100);
             const firePct = Math.round(s.fireCooldownMult * 100);
             return `
-          <article class="armory-ship-card ${equipped ? "armory-ship-card--equipped" : ""} ${selected ? "armory-ship-card--selected" : ""}" data-ship="${id}" data-preview-ship="${id}" role="button" tabindex="0">
+          <article class="armory-ship-card ${equipped ? "armory-ship-card--equipped" : ""} ${selected ? "armory-ship-card--selected" : ""} ${!owned ? "armory-ship-card--locked" : ""}" data-ship="${id}" data-preview-ship="${id}" role="button" tabindex="0">
             <canvas class="armory-ship-preview" width="56" height="40"
               data-ship-preview="${s.spriteKey}" data-ship-color="${s.color}" aria-hidden="true"></canvas>
             <div class="armory-ship-info">
@@ -272,17 +473,30 @@ export function createArmoryScreen(onBack: () => void): Screen {
             <div class="armory-ship-actions">
               ${
                 equipped
-                  ? '<span class="armory-equipped-badge">Equipped</span>'
+                  ? '<span class="armory-equipped-badge">Selected</span>'
                   : owned
-                    ? `<button type="button" class="btn btn-sm" data-equip-ship="${id}">Equip</button>`
-                    : `<button type="button" class="btn btn-sm btn-token" data-buy-ship="${id}" ${meta.tokens < s.tokenCost ? "disabled" : ""}>
-                        ${s.tokenCost === 0 ? "Free" : `Unlock ${s.tokenCost} ◎`}
-                      </button>`
+                    ? `<button type="button" class="btn btn-sm" data-equip-ship="${id}">Select</button>`
+                    : `<span class="armory-lock-label">${s.tokenCost} ◎</span>`
               }
             </div>
           </article>`;
           })
           .join("");
+        const futureSlots = [1, 2]
+          .map(
+            (n) => `
+          <article class="armory-ship-card armory-ship-card--future" aria-disabled="true">
+            <div class="armory-ship-preview armory-ship-preview--ghost" aria-hidden="true">?</div>
+            <div class="armory-ship-info">
+              <h3 class="armory-ship-name">Classified ${n}</h3>
+              <p class="armory-ship-tag">Future hull · coming soon</p>
+            </div>
+            <span class="armory-lock-label">🔒</span>
+          </article>`
+          )
+          .join("");
+        return cards + futureSlots;
+      };
 
       const renderGunCards = (): string =>
         ARMORY_GUNS.map((g) => {
@@ -359,8 +573,9 @@ export function createArmoryScreen(onBack: () => void): Screen {
             </div>
           </div>
           ${renderCompare()}
+          ${renderHangarHero()}
           <section class="panel cabinet-panel">
-            <h2 class="panel-label">Ship hangar</h2>
+            <h2 class="panel-label">All hulls</h2>
             <div class="armory-ship-grid">${renderShipCards()}</div>
           </section>
           <section class="panel cabinet-panel">
@@ -381,6 +596,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
         bindEvents();
         mountArmoryShipSprites(root);
         const pvShip = SHIP_PROFILES[previewShip];
+        mountHangarHeroPreview(root, pvShip.spriteKey, pvShip.color);
         previewCleanup = mountArmoryGunPreviews(root, {
           selectedGun: previewGun,
           shipSprite: pvShip.spriteKey,
@@ -412,6 +628,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
             const cost = SHIP_PROFILES[id].tokenCost;
             if (meta.unlockedShips.includes(id) || meta.tokens < cost) return;
             meta.tokens -= cost;
+            recordTokenSpend(meta, cost);
             meta.unlockedShips.push(id);
             meta.equippedShip = id;
             previewShip = id;
@@ -435,6 +652,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
             const def = ARMORY_GUNS.find((g) => g.id === id)!;
             if (meta.unlockedGuns.includes(id) || meta.tokens < def.tokenCost) return;
             meta.tokens -= def.tokenCost;
+            recordTokenSpend(meta, def.tokenCost);
             meta.unlockedGuns.push(id);
             meta.equippedGun = id;
             previewGun = id;

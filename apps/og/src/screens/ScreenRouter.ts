@@ -9,6 +9,8 @@ export type ScreenId =
   | "highScores"
   | "howToPlay"
   | "challenges"
+  | "dailyOps"
+  | "gameModes"
   | "armory";
 
 export interface Screen {

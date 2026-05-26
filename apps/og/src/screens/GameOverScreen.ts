@@ -2,6 +2,7 @@ import type { LocalStorageRepo } from "../storage/LocalStorageRepo";
 import type { Screen } from "./ScreenRouter";
 import { AudioManager } from "../audio/AudioManager";
 import { renderGameOverShell } from "../ui/cabinetShell";
+import { trapFocus, type FocusTrapHandle } from "../ui/focusTrap";
 
 export interface GameOverScreenDeps {
   repo: LocalStorageRepo;
@@ -14,6 +15,7 @@ export interface GameOverScreenDeps {
 export class GameOverScreen implements Screen {
   id = "gameOver" as const;
   private initials = ["", "", ""];
+  private focusTrap: FocusTrapHandle | null = null;
 
   constructor(private deps: GameOverScreenDeps) {}
 
@@ -136,7 +138,25 @@ export class GameOverScreen implements Screen {
       this.deps.onMenu();
     });
 
-    if (qualifies) inputs[0]?.focus();
+    const shell = root.querySelector<HTMLElement>(".go-cabinet-shell");
+    if (shell) {
+      shell.setAttribute("role", "dialog");
+      shell.setAttribute("aria-modal", "true");
+      shell.setAttribute(
+        "aria-labelledby",
+        qualifies ? "go-dialog-title go-initials-heading" : "go-dialog-title"
+      );
+      const titleEl = shell.querySelector<HTMLElement>(".screen-title");
+      if (titleEl && !titleEl.id) titleEl.id = "go-dialog-title";
+      const initialsHeading = shell.querySelector<HTMLElement>(".initials-panel .panel-label");
+      if (initialsHeading && qualifies) initialsHeading.id = "go-initials-heading";
+
+      this.focusTrap = trapFocus(shell, {
+        initial: qualifies ? inputs[0] ?? null : root.querySelector<HTMLElement>('[data-action="retry"]'),
+      });
+    } else if (qualifies) {
+      inputs[0]?.focus();
+    }
 
     if (isNewHigh) {
       const audio = new AudioManager();
@@ -145,5 +165,8 @@ export class GameOverScreen implements Screen {
     }
   }
 
-  unmount(): void {}
+  unmount(): void {
+    this.focusTrap?.release();
+    this.focusTrap = null;
+  }
 }

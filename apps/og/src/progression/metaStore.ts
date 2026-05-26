@@ -10,6 +10,13 @@ export type OgMetaUpgrade =
   | "comboExtend"
   | "luckySlot";
 
+export interface ChallengeSeenState {
+  badges: string[];
+  weeklyClaimed: string[];
+  dailyDate: string;
+  dailyDone: boolean;
+}
+
 export interface OgMeta {
   stars: number;
   tokens: number;
@@ -30,6 +37,18 @@ export interface OgMeta {
   equippedGun: ArmoryGunId;
   unlockedShips: ShipId[];
   unlockedGuns: ArmoryGunId[];
+  /** Lifetime tokens spent in Armory (ships, guns, upgrades). */
+  totalTokensSpent: number;
+  /** ISO week key for weekly challenge reset (e.g. 2026-W21). */
+  weeklyWeekKey: string;
+  /** Progress counters for active weekly challenges. */
+  weeklyProgress: Record<string, number>;
+  /** Weekly challenge ids claimed this week. */
+  weeklyClaimed: string[];
+  /** Snapshot when user last opened Daily/Challenges screens. */
+  lastSeenChallengeState?: ChallengeSeenState;
+  /** Consecutive daily ops completion streak. */
+  dailyStreak: number;
 }
 
 const KEY = "og_meta";
@@ -50,7 +69,30 @@ const DEFAULT: OgMeta = {
   equippedGun: "single",
   unlockedShips: ["striker"],
   unlockedGuns: ["single"],
+  totalTokensSpent: 0,
+  weeklyWeekKey: getWeeklyWeekKey(),
+  weeklyProgress: {},
+  weeklyClaimed: [],
+  dailyStreak: 0,
 };
+
+export function getWeeklyWeekKey(d = new Date()): string {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+}
+
+export function ensureWeeklyFresh(meta: OgMeta): OgMeta {
+  const key = getWeeklyWeekKey();
+  if (meta.weeklyWeekKey === key) return meta;
+  meta.weeklyWeekKey = key;
+  meta.weeklyProgress = {};
+  meta.weeklyClaimed = [];
+  return meta;
+}
 
 export function loadOgMeta(): OgMeta {
   try {
@@ -90,11 +132,23 @@ function migrateMeta(m: OgMeta): OgMeta {
     m.endlessBestDepth = 0;
   }
   if (!Array.isArray(m.endlessMilestones)) m.endlessMilestones = [];
-  return m;
+  if (typeof m.totalTokensSpent !== "number") m.totalTokensSpent = 0;
+  if (!m.weeklyWeekKey) m.weeklyWeekKey = getWeeklyWeekKey();
+  if (!m.weeklyProgress) m.weeklyProgress = {};
+  if (!Array.isArray(m.weeklyClaimed)) m.weeklyClaimed = [];
+  if (typeof m.dailyStreak !== "number") m.dailyStreak = 0;
+  return ensureWeeklyFresh(m);
 }
 
 export function saveOgMeta(m: OgMeta): void {
   localStorage.setItem(KEY, JSON.stringify(m));
+}
+
+/** Track Armory token spend for challenges and stats. */
+export function recordTokenSpend(meta: OgMeta, amount: number): void {
+  if (amount <= 0) return;
+  meta.totalTokensSpent += amount;
+  saveOgMeta(meta);
 }
 
 export const UPGRADE_COSTS: Record<OgMetaUpgrade, number> = {

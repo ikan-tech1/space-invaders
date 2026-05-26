@@ -59,6 +59,20 @@ const DAILY_POOL: DailyChallengeDef[] = [
     tokenReward: 20,
     check: (s) => s.levelsCleared >= 3,
   },
+  {
+    id: "daily_kills_15",
+    title: "Skirmish",
+    description: "Destroy 15 aliens in one run",
+    tokenReward: 8,
+    check: (s) => s.killsThisRun >= 15,
+  },
+  {
+    id: "daily_combo_4",
+    title: "Chain Starter",
+    description: "Reach 4× combo multiplier in one run",
+    tokenReward: 6,
+    check: (s) => s.maxCombo >= 4,
+  },
 ];
 
 function dateKey(d = new Date()): string {
@@ -71,10 +85,20 @@ function hashStr(s: string): number {
   return Math.abs(h);
 }
 
+/** Primary daily task (legacy single challenge). */
 export function getDailyChallenge(forDate = new Date()): DailyChallengeDef {
+  return getDailyTasks(forDate)[0]!;
+}
+
+/** Today's 1–3 daily ops tasks (deterministic per local date). */
+export function getDailyTasks(forDate = new Date(), count = 3): DailyChallengeDef[] {
   const key = dateKey(forDate);
-  const idx = hashStr(key) % DAILY_POOL.length;
-  return DAILY_POOL[idx]!;
+  const start = hashStr(key) % DAILY_POOL.length;
+  const tasks: DailyChallengeDef[] = [];
+  for (let i = 0; i < Math.min(count, DAILY_POOL.length); i++) {
+    tasks.push(DAILY_POOL[(start + i) % DAILY_POOL.length]!);
+  }
+  return tasks;
 }
 
 export function getDailyDateKey(): string {
@@ -87,4 +111,50 @@ export function loadDailyCompletedDate(): string | null {
 
 export function saveDailyCompleted(date: string): void {
   localStorage.setItem("og_daily_completed", date);
+}
+
+/** Milliseconds until local midnight. */
+export function msUntilMidnight(now = new Date()): number {
+  const next = new Date(now);
+  next.setHours(24, 0, 0, 0);
+  return Math.max(0, next.getTime() - now.getTime());
+}
+
+export function formatCountdown(ms: number): string {
+  const totalSec = Math.ceil(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+const STREAK_KEY = "og_daily_streak";
+const LAST_STREAK_DATE_KEY = "og_daily_streak_date";
+
+export function loadDailyStreak(): number {
+  try {
+    return parseInt(localStorage.getItem(STREAK_KEY) || "0", 10) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Call when daily ops bundle is completed for today. */
+export function bumpDailyStreak(completedDate = getDailyDateKey()): number {
+  const last = localStorage.getItem(LAST_STREAK_DATE_KEY);
+  let streak = loadDailyStreak();
+  if (last === completedDate) return streak;
+
+  const yesterday = new Date(completedDate);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = dateKey(yesterday);
+
+  if (last === yesterdayKey) streak += 1;
+  else streak = 1;
+
+  localStorage.setItem(STREAK_KEY, String(streak));
+  localStorage.setItem(LAST_STREAK_DATE_KEY, completedDate);
+  return streak;
 }

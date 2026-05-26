@@ -88,8 +88,10 @@ import {
   getDailyDateKey,
   loadDailyCompletedDate,
   saveDailyCompleted,
+  bumpDailyStreak,
   type DailyRunStats,
 } from "../progression/dailyChallenges";
+import { applyWeeklyProgress } from "../progression/weeklyChallenges";
 import { queuePendingToast } from "../progression/pendingToasts";
 import type { FormationType } from "../config";
 import {
@@ -209,6 +211,7 @@ export class Game {
   runBossDefeated = false;
   runFlawlessLevel = false;
   runLevelsCleared = 0;
+  runBossesThisRun = 0;
   pendingEndlessMultBoost = 0;
   pendingIronShield = false;
   pendingScoreSurge = false;
@@ -228,7 +231,8 @@ export class Game {
       loadOgMeta().badges,
       loadOgMeta().equippedShip,
       loadOgMeta().equippedGun,
-      loadOgMeta().unlockedGuns.length
+      loadOgMeta().unlockedGuns.length,
+      loadOgMeta().totalTokensSpent ?? 0
     );
     this.eggs = new EasterEggRegistry(0, false);
   }
@@ -255,7 +259,8 @@ export class Game {
       this.meta.badges,
       this.meta.equippedShip,
       this.meta.equippedGun,
-      this.meta.unlockedGuns.length
+      this.meta.unlockedGuns.length,
+      this.meta.totalTokensSpent ?? 0
     );
     this.eggs = new EasterEggRegistry(
       parseInt(localStorage.getItem("og_total_kills") || "0", 10),
@@ -283,6 +288,7 @@ export class Game {
     this.runBossDefeated = false;
     this.runFlawlessLevel = false;
     this.runLevelsCleared = 0;
+    this.runBossesThisRun = 0;
     this.startLevel();
     this.callbacks.onLivesChange(this.lives);
     this.callbacks.onScoreChange(this.score);
@@ -783,6 +789,7 @@ export class Game {
           if (this.boss.hp <= 0) {
             this.grantTokens(this.boss.kind === "mini" ? 8 : 15);
             this.runBossDefeated = true;
+            this.runBossesThisRun++;
             this.addScore(BOSS_POINTS);
             this.particles.burst(this.boss.x, this.boss.y, this.boss.accent, 24);
             const bossKind = this.boss.kind;
@@ -1607,11 +1614,47 @@ export class Game {
       );
       saveOgMeta(this.meta);
     }
+    this.finalizeRunChallenges();
     if (!campaignWin) {
       this.audio.play("gameOver");
       this.tryCompleteDailyChallenge();
     }
     this.callbacks.onGameOver(this.score, this.levelDirector.level);
+  }
+
+  private finalizeRunChallenges(): void {
+    const runStats = {
+      runKills: this.runKills,
+      runTokensEarned: this.runTokensEarned,
+      runBossDefeated: this.runBossDefeated,
+      totalTokensSpent: this.meta.totalTokensSpent ?? 0,
+    };
+    const newRun = this.challenges.checkOnRunEnd(runStats);
+    for (const c of newRun) {
+      const def = OG_CHALLENGES.find((ch) => ch.id === c.id);
+      if (def?.starReward) {
+        this.meta.stars += def.starReward;
+        const msg = `${def.title} — +${def.starReward} ★`;
+        this.callbacks.onToast(msg);
+        queuePendingToast(`Achievement: ${msg}`);
+      }
+      if (def?.tokenReward) {
+        this.meta.tokens += def.tokenReward;
+        this.callbacks.onTokensChange(this.meta.tokens);
+      }
+    }
+    this.meta.badges = this.challenges.getCompletedIds();
+    saveOgMeta(this.meta);
+
+    const weeklyToasts = applyWeeklyProgress({
+      kills: this.runKills,
+      levelsCleared: this.runLevelsCleared,
+      bossesDefeated: this.runBossesThisRun,
+    });
+    for (const msg of weeklyToasts) {
+      this.callbacks.onToast(msg);
+      queuePendingToast(`Achievement: ${msg}`);
+    }
   }
 
   private tryCompleteDailyChallenge(): void {
@@ -1628,6 +1671,8 @@ export class Game {
     };
     if (!daily.check(stats)) return;
     saveDailyCompleted(today);
+    const streak = bumpDailyStreak(today);
+    this.meta.dailyStreak = streak;
     this.meta.tokens += daily.tokenReward;
     saveOgMeta(this.meta);
     this.callbacks.onTokensChange(this.meta.tokens);

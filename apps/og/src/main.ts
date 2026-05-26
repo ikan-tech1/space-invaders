@@ -9,6 +9,8 @@ import { ScreenRouter } from "./screens/ScreenRouter";
 import {
   createArmoryScreen,
   createChallengesScreen,
+  createDailyOpsScreen,
+  createGameModesScreen,
   createHighScoresScreen,
   createHowToPlayScreen,
   createSettingsScreen,
@@ -41,6 +43,8 @@ function showMenu(): void {
         if (screen === "highScores") router.show(createHighScoresScreen(repo, showMenu));
         if (screen === "howToPlay") router.show(createHowToPlayScreen(showMenu));
         if (screen === "challenges") router.show(createChallengesScreen(showMenu));
+        if (screen === "dailyOps") router.show(createDailyOpsScreen(showMenu));
+        if (screen === "gameModes") router.show(createGameModesScreen(showMenu));
         if (screen === "armory") router.show(createArmoryScreen(showMenu));
       },
       onCampaign: () => {

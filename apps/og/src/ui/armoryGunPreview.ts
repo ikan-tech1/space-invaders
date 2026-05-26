@@ -184,19 +184,54 @@ export function mountArmoryGunPreviews(
   return () => cleanups.forEach((fn) => fn());
 }
 
+function drawShipOnCanvas(
+  canvas: HTMLCanvasElement,
+  sprite: string,
+  color: string,
+  scale = 2
+): void {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.fillStyle = "#060a14";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = "rgba(0, 240, 255, 0.1)";
+  ctx.setLineDash([4, 8]);
+  ctx.beginPath();
+  ctx.moveTo(0, canvas.height * 0.72);
+  ctx.lineTo(canvas.width, canvas.height * 0.72);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  const cx = canvas.width / 2;
+  const cy = canvas.height * 0.62;
+  const ox =
+    sprite === "playerTitan"
+      ? cx - 11 * scale
+      : sprite === "playerVanguard"
+        ? cx - 8 * scale
+        : cx - 7 * scale;
+  const oy =
+    sprite === "playerTitan"
+      ? cy - 10 * scale
+      : sprite === "playerVanguard"
+        ? cy - 9 * scale
+        : cy - 8 * scale;
+  drawSprite(ctx, sprite, ox, oy, color, scale);
+}
+
 export function mountArmoryShipSprites(root: HTMLElement): void {
   root.querySelectorAll<HTMLCanvasElement>("canvas[data-ship-preview]").forEach((canvas) => {
     const sprite = canvas.dataset.shipPreview;
     const color = canvas.dataset.shipColor ?? "#00f0ff";
     if (!sprite) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.fillStyle = "#060a14";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const ox = sprite === "playerTitan" ? 4 : sprite === "playerVanguard" ? 5 : 6;
-    const oy = sprite === "playerTitan" ? 2 : sprite === "playerVanguard" ? 3 : 4;
-    drawSprite(ctx, sprite, ox, oy, color, 2);
+    drawShipOnCanvas(canvas, sprite, color, 2);
   });
+}
+
+/** Large hangar hero preview for ship selection. */
+export function mountHangarHeroPreview(root: HTMLElement, sprite: string, color: string): void {
+  const canvas = root.querySelector<HTMLCanvasElement>("canvas[data-ship-hero]");
+  if (!canvas) return;
+  drawShipOnCanvas(canvas, sprite, color, 3);
 }
 
 function statDelta(a: number, b: number): string {
