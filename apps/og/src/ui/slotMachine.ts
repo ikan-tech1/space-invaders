@@ -1,5 +1,6 @@
 import type { AudioManager } from "../audio/AudioManager";
 import {
+  PICKUP_DEFS,
   POWERUP_LABELS,
   SLOT_LIFE_CHANCE,
   SLOT_POWERUP_CHANCE,
@@ -38,10 +39,17 @@ const FILLER: ReelSymbol[] = [
   "twin",
   "triple",
   "plasma",
-  "shield",
+  "volleyUp",
+  "fireRate",
+  "scatter",
+  "homing",
+  "comboAura",
+  "tokenBurst",
+  "hyperSpeed",
   "clone",
   "bunker",
   "slow",
+  "invulnPulse",
 ];
 
 function rollOutcome(ctx: SlotMachineContext): SlotOutcome {
@@ -111,6 +119,15 @@ function symbolLabel(sym: ReelSymbol): string {
   if (sym === "tokens") return "◎";
   if (sym === "secondWind") return "☼";
   return SLOT_SYMBOLS[sym as keyof typeof SLOT_SYMBOLS] ?? sym;
+}
+
+function symbolClass(sym: ReelSymbol): string {
+  const base = `slot-symbol slot-symbol--${sym}`;
+  if (sym === "life" || sym === "miss" || sym === "shield" || sym === "tokens" || sym === "secondWind") {
+    return base;
+  }
+  const cat = PICKUP_DEFS[sym as PowerUpType]?.category ?? "weapon";
+  return `${base} slot-symbol--cat-${cat}`;
 }
 
 function outcomeMessage(outcome: SlotOutcome): string {
@@ -210,7 +227,7 @@ export function showSlotMachine(
                     ${strip
                       .map(
                         (sym) =>
-                          `<span class="slot-symbol slot-symbol--${sym}">${symbolLabel(sym)}</span>`
+                          `<span class="${symbolClass(sym)}">${symbolLabel(sym)}</span>`
                       )
                       .join("")}
                   </div>

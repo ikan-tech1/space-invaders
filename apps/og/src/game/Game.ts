@@ -1,4 +1,5 @@
 import {
+  ALIEN_DROP_CHANCE,
   ALIEN_POINTS,
   ALIEN_STEP_DOWN,
   BASE_ALIEN_H_STEP,
@@ -9,20 +10,28 @@ import {
   COMBO_MAX,
   COMBO_WINDOW,
   DIFFICULTY_CONFIG,
+  ENDLESS_DROP_BONUS,
   ENEMY_BULLET_SPEED,
+  getPickupDef,
   INVULN_TIME,
+  MAX_PICKUPS_ON_SCREEN,
   MIN_ALIEN_TICK,
+  pickupToastLine,
   PLAYER_FIRE_COOLDOWN,
   PLAYER_SPEED,
   PLAYER_Y,
   PLASMA_FIRE_COOLDOWN,
   POWERUP_DURATION,
   POWERUP_LABELS,
+  PICKUP_DEFS,
   RAPID_FIRE_COOLDOWN,
+  buildPickupPool,
+  rollFieldPickup,
+  rollGoodPickup,
   SINGLE_BULLET_TOP_EXIT_Y,
   SINGLE_FIRE_COOLDOWN,
-  SLOW_DURATION,
   SLOT_MAX_LIVES,
+  type PickupRollContext,
   UFO_POINTS,
   type Difficulty,
   type GameMode,
@@ -53,7 +62,9 @@ import type { LevelCompleteReport } from "../progression/levelComplete";
 import { LevelChallengeTracker } from "../progression/levelChallenges";
 import { loadOgMeta, saveOgMeta, type OgMeta } from "../progression/metaStore";
 import {
+  bumpVolleyTier,
   createVolley,
+  PICKUP_WEAPON_PROFILE,
   playerBulletBlocksSlot,
   profileBypassesBulletSlot,
   profileFireCooldownMult,
@@ -108,9 +119,10 @@ export interface GameCallbacks {
   onLoadoutChange: (ship: string, gun: string) => void;
   onSectorBriefing: (level: number) => void;
   onBossWeakPoint: (visible: boolean, label: string) => void;
+  onActiveBuffs: (buffs: { symbol: string; label: string; remaining: number }[]) => void;
 }
 
-const BASE_POWERUPS: PowerUpType[] = ["rapid", "spread", "shield", "slow"];
+export type PickupDropTier = "alien" | "ufo" | "miniBoss" | "bigBoss";
 
 export class Game {
   state: GameState = "playing";
@@ -150,6 +162,9 @@ export class Game {
   activePowerUp: PowerUpType | null = null;
   powerUpTimer = 0;
   slowTimer = 0;
+  timedBuffTimers = new Map<PowerUpType, number>();
+  aegisUntilHit = false;
+  comboAuraUntilHit = false;
 
   shakeX = 0;
   shakeY = 0;
@@ -411,6 +426,11 @@ export class Game {
     this.fireCooldown = 0;
     this.gunVolley = "single";
     this.gunVolleyTimer = 0;
+    this.timedBuffTimers.clear();
+    this.aegisUntilHit = false;
+    this.comboAuraUntilHit = false;
+    this.slowTimer = 0;
+    this.pushHudBuffs();
 
     const cfg = getLevelConfig(this.levelDirector.level);
     this.currentFormation = cfg.formation;
@@ -489,6 +509,7 @@ export class Game {
       this.gunVolleyTimer -= dt;
       if (this.gunVolleyTimer <= 0) this.gunVolley = "single";
     }
+    this.updateTimedBuffs(dt);
 
     if (this.state === "levelInterstitial") {
       this.interstitialTimer -= dt;
@@ -576,24 +597,26 @@ export class Game {
   }
 
   private resolveFireProfile(): GunVolley {
+    if (this.getTimedBuff("curseSolo") > 0) return "single";
     if (this.plasmaTimer > 0) return "plasma";
     if (this.gunVolleyTimer > 0) return this.gunVolley;
     if (this.activePowerUp === "spread") return "spread";
     if (this.activePowerUp === "rapid") return "rapid";
-    return this.meta.equippedGun as GunVolley;
+    let base = this.meta.equippedGun as GunVolley;
+    if (this.getTimedBuff("volleyUp") > 0) base = bumpVolleyTier(base);
+    return base;
   }
 
   private updatePlayer(dt: number): void {
     const ship = this.getShipProfile();
     const axis = this.input.getMoveAxis();
-    this.playerX += axis * PLAYER_SPEED * ship.speedMult * dt;
+    const speedMult =
+      ship.speedMult * (this.getTimedBuff("hyperSpeed") > 0 ? 1.45 : 1);
+    this.playerX += axis * PLAYER_SPEED * speedMult * dt;
     this.playerX = Math.max(24, Math.min(CANVAS_WIDTH - 24, this.playerX));
 
     if (this.invulnTimer > 0) this.invulnTimer -= dt;
     if (this.eggs.isInvulnBuff()) this.invulnTimer = Math.max(this.invulnTimer, 0.1);
-
-    if (this.plasmaTimer > 0) this.plasmaTimer -= dt;
-    if (this.cloneTimer > 0) this.cloneTimer -= dt;
 
     const profile = this.resolveFireProfile();
 
@@ -614,9 +637,12 @@ export class Game {
       profileFireCooldownMult(profile) *
       ship.fireCooldownMult *
       (this.meta.upgrades.includes("fastShot") ? 0.82 : 1) *
+      (this.getTimedBuff("fireRate") > 0 ? 0.72 : 1) *
+      (this.getTimedBuff("curseSlowFire") > 0 ? 1.55 : 1) *
       DIFFICULTY_CONFIG[this.difficulty].fireCooldownMult;
     if (this.fireCooldown > 0) this.fireCooldown -= dt;
 
+    if (this.getTimedBuff("curseJam") > 0) return;
     if (!this.input.isFirePressed() || this.fireCooldown > 0 || !slotOpen) return;
 
     this.fireVolley(profile);
@@ -703,7 +729,7 @@ export class Game {
           this.particles.burst(this.ufo.x, this.ufo.y, "#ffd24a", 16);
           this.ufo.active = false;
           this.audio.play("explosion");
-          this.maybeDropPowerUp(this.ufo.x, this.ufo.y);
+          this.maybeDropPowerUp(this.ufo.x, this.ufo.y, "ufo");
         }
         if (hit.boss && this.boss) {
           this.levelChallenges.onShotHit();
@@ -727,6 +753,7 @@ export class Game {
             this.boss.active = false;
             for (const a of this.aliens) a.alive = false;
             this.audio.play("bossDefeat");
+            this.dropBossPickups(this.boss.x, this.boss.y, bossKind);
             if (!this.levelDamageThisLevel) {
               this.handleEggReward(
                 this.eggs.onBossFlawless(bossKind, this.bossPhase2Reached)
@@ -755,7 +782,7 @@ export class Game {
           }
           this.audio.play("explosion");
           this.registerComboKill();
-          this.maybeDropPowerUp(hit.alien.x, hit.alien.y);
+          this.maybeDropPowerUp(hit.alien.x + 14, hit.alien.y + 11, "alien");
         }
         const pierce = (b as Bullet & { pierce?: boolean }).pierce;
         if (!pierce) {
@@ -783,12 +810,15 @@ export class Game {
 
     const speedMult = this.levelDirector.speedMult(this.difficulty);
     const slow = this.slowTimer > 0 ? 0.4 : 1;
+    const frozen = this.getTimedBuff("freezeAliens") > 0 ? 0 : 1;
     const alienSlow = this.alienSlowActive ? 0.8 : 1;
     const levelPace = 1 + Math.min(0.14, (this.levelDirector.level - 1) * 0.018);
     const tick = Math.max(
       MIN_ALIEN_TICK,
       (BASE_ALIEN_TICK - (55 - alive.length) * 0.008) / speedMult / slow / alienSlow / levelPace
     );
+
+    if (frozen === 0) return;
 
     this.alienTickTimer += dt;
     if (this.alienTickTimer >= tick) {
@@ -952,28 +982,186 @@ export class Game {
     this.powerUps = this.powerUps.filter((p) => p.active);
   }
 
-  private getAvailablePowerups(): PowerUpType[] {
-    const list: PowerUpType[] = [...BASE_POWERUPS, "twin", "triple"];
-    if (this.levelDirector.level >= 2) list.push("quint");
-    if (this.levelDirector.level >= 4) list.push("hex");
-    if (this.meta.unlockedPickups.includes("plasma") || this.challenges.completed.has("no_hit_l3"))
-      list.push("plasma");
-    if (this.levelDirector.level >= 3) list.push("bunker");
-    if (this.meta.unlockedPickups.includes("clone")) list.push("clone");
-    return list;
+  private pickupRollContext(): PickupRollContext {
+    return {
+      level: this.levelDirector.level,
+      gameMode: this.gameMode,
+      unlockedPickups: this.meta.unlockedPickups,
+      unlockedGuns: this.meta.unlockedGuns,
+      challengePlasma: this.challenges.completed.has("no_hit_l3"),
+    };
   }
 
-  private maybeDropPowerUp(x: number, y: number): void {
-    if (Math.random() > 0.12) return;
-    const types = this.getAvailablePowerups();
-    const type = types[Math.floor(Math.random() * types.length)]!;
-    this.powerUps.push({ x, y, vy: 60, type, active: true });
+  private getAvailablePowerups(): PowerUpType[] {
+    return buildPickupPool(this.pickupRollContext()).map((p) => p.type);
+  }
+
+  private activePickupCount(): number {
+    return this.powerUps.filter((p) => p.active).length;
+  }
+
+  private spawnPickup(x: number, y: number, type: PowerUpType): void {
+    if (this.activePickupCount() >= MAX_PICKUPS_ON_SCREEN) return;
+    const spread = (this.powerUps.length % 3) * 18 - 18;
+    this.powerUps.push({
+      x: x + spread,
+      y,
+      vy: 58 + Math.random() * 12,
+      type,
+      active: true,
+    });
+  }
+
+  private maybeDropPowerUp(x: number, y: number, tier: PickupDropTier): void {
+    const ctx = this.pickupRollContext();
+    if (tier === "alien") {
+      let chance = ALIEN_DROP_CHANCE[this.difficulty];
+      if (this.gameMode === "endless") chance += ENDLESS_DROP_BONUS;
+      if (Math.random() > chance) return;
+      const type = rollFieldPickup(ctx);
+      if (type) this.spawnPickup(x, y, type);
+      return;
+    }
+
+    if (tier === "ufo") {
+      const type = rollGoodPickup(ctx) ?? rollFieldPickup(ctx);
+      if (type) this.spawnPickup(x, y, type);
+      return;
+    }
+
+    if (tier === "miniBoss") {
+      const good = rollGoodPickup(ctx) ?? "shield";
+      this.spawnPickup(x - 20, y, good);
+      const extra = rollFieldPickup(ctx);
+      if (extra) this.spawnPickup(x + 20, y, extra);
+      return;
+    }
+
+    if (tier === "bigBoss") {
+      const drops = 2 + (Math.random() < 0.45 ? 1 : 0);
+      for (let i = 0; i < drops; i++) {
+        const type =
+          i === 0
+            ? rollGoodPickup(ctx) ?? "volleyUp"
+            : rollFieldPickup(ctx) ?? rollGoodPickup(ctx);
+        if (type) this.spawnPickup(x + (i - 1) * 28, y, type);
+      }
+    }
+  }
+
+  private dropBossPickups(x: number, y: number, kind: "mini" | "big"): void {
+    this.maybeDropPowerUp(x, y, kind === "mini" ? "miniBoss" : "bigBoss");
+  }
+
+  private setTimedBuff(type: PowerUpType, seconds: number): void {
+    const prev = this.timedBuffTimers.get(type) ?? 0;
+    this.timedBuffTimers.set(type, Math.max(prev, seconds));
+    this.pushHudBuffs();
+  }
+
+  private getTimedBuff(type: PowerUpType): number {
+    return this.timedBuffTimers.get(type) ?? 0;
+  }
+
+  private updateTimedBuffs(dt: number): void {
+    for (const [key, t] of [...this.timedBuffTimers]) {
+      const next = t - dt;
+      if (next <= 0) {
+        this.timedBuffTimers.delete(key);
+        const weapon = PICKUP_WEAPON_PROFILE[key];
+        if (weapon && this.gunVolley === weapon) {
+          this.gunVolleyTimer = 0;
+          this.gunVolley = "single";
+        }
+        if (key === "plasma") this.plasmaTimer = 0;
+        if (key === "clone") this.cloneTimer = 0;
+      } else {
+        this.timedBuffTimers.set(key, next);
+      }
+    }
+    if (this.timedBuffTimers.has("plasma")) {
+      this.plasmaTimer = this.timedBuffTimers.get("plasma")!;
+    }
+    if (this.timedBuffTimers.has("clone")) {
+      this.cloneTimer = this.timedBuffTimers.get("clone")!;
+    }
+    if (this.slowTimer > 0) this.slowTimer -= dt;
+    this.pushHudBuffs();
+  }
+
+  private pushHudBuffs(): void {
+    const buffs: { symbol: string; label: string; remaining: number }[] = [];
+    for (const [type, remaining] of this.timedBuffTimers) {
+      const def = getPickupDef(type);
+      buffs.push({ symbol: def.symbol, label: def.label, remaining });
+    }
+    if (this.slowTimer > 0) {
+      buffs.push({
+        symbol: PICKUP_DEFS.slow.symbol,
+        label: PICKUP_DEFS.slow.label,
+        remaining: this.slowTimer,
+      });
+    }
+    if (this.aegisUntilHit) {
+      buffs.push({
+        symbol: PICKUP_DEFS.aegis.symbol,
+        label: "Aegis",
+        remaining: -1,
+      });
+    }
+    if (this.comboAuraUntilHit) {
+      buffs.push({
+        symbol: PICKUP_DEFS.comboAura.symbol,
+        label: "Combo Aura",
+        remaining: -1,
+      });
+    }
+    this.callbacks.onActiveBuffs(buffs);
+  }
+
+  private applyWeaponPickup(type: PowerUpType): void {
+    const profile = PICKUP_WEAPON_PROFILE[type];
+    if (!profile) return;
+    const def = getPickupDef(type);
+    const dur = def.durationSec ?? POWERUP_DURATION;
+    if (profile === "plasma") {
+      this.plasmaTimer = dur;
+      this.timedBuffTimers.set("plasma", dur);
+    } else if (type === "rapid" || type === "spread") {
+      this.gunVolley = profile;
+      this.gunVolleyTimer = dur;
+      this.timedBuffTimers.set(type, dur);
+    } else {
+      this.gunVolley = profile;
+      this.gunVolleyTimer = dur;
+      this.timedBuffTimers.set(type, dur);
+    }
+  }
+
+  private purgeBottomAlienRow(): void {
+    const alive = this.aliens.filter((a) => a.alive);
+    if (!alive.length) return;
+    const maxY = Math.max(...alive.map((a) => a.y));
+    for (const a of alive) {
+      if (a.y >= maxY - 4) {
+        a.alive = false;
+        this.addScore(ALIEN_POINTS[a.type] ?? 10);
+        this.particles.burst(a.x + 14, a.y + 11, "#ff2d95", 12);
+      }
+    }
+    this.audio.play("explosion");
+    this.addShake(0.18);
   }
 
   private applyPowerUp(type: PowerUpType): void {
-    this.audio.play("powerup");
+    const def = getPickupDef(type);
+    const isCurse = def.category === "curse";
+    this.audio.play(isCurse ? "playerHit" : "powerup");
+    this.callbacks.onToast(pickupToastLine(type));
+
     if (type === "shield") {
       for (const s of this.shields) patchShield(s);
+      this.pushHudBuffs();
       return;
     }
     if (type === "bunker") {
@@ -984,30 +1172,73 @@ export class Game {
       return;
     }
     if (type === "slow") {
-      this.slowTimer = SLOW_DURATION;
-      return;
-    }
-    if (type === "plasma") {
-      this.plasmaTimer = 6;
-      this.gunVolley = "plasma";
+      this.slowTimer = def.durationSec ?? 3;
+      this.pushHudBuffs();
       return;
     }
     if (type === "clone") {
-      this.cloneTimer = 5;
+      const dur = def.durationSec ?? 5;
+      this.cloneTimer = dur;
+      this.setTimedBuff("clone", dur);
       return;
     }
-    if (type === "twin" || type === "triple" || type === "quint" || type === "hex") {
-      this.gunVolley = type;
-      this.gunVolleyTimer = POWERUP_DURATION;
+    if (PICKUP_WEAPON_PROFILE[type]) {
+      this.applyWeaponPickup(type);
       return;
     }
-    if (type === "rapid" || type === "spread") {
-      this.gunVolley = type;
-      this.gunVolleyTimer = POWERUP_DURATION;
+    if (type === "volleyUp" || type === "fireRate" || type === "curseSolo" || type === "curseSlowFire" || type === "curseJam") {
+      this.setTimedBuff(type, def.durationSec ?? 8);
       return;
     }
+    if (type === "aegis") {
+      this.aegisUntilHit = true;
+      this.pushHudBuffs();
+      return;
+    }
+    if (type === "comboAura") {
+      this.comboAuraUntilHit = true;
+      this.comboMult = Math.max(this.comboMult, 2);
+      this.pushHudBuffs();
+      return;
+    }
+    if (type === "invulnPulse") {
+      this.invulnTimer = Math.max(this.invulnTimer, def.durationSec ?? 3);
+      return;
+    }
+    if (type === "extraLife") {
+      if (this.lives < SLOT_MAX_LIVES) {
+        this.lives++;
+        this.callbacks.onLivesChange(this.lives);
+        this.callbacks.onToast("Rescue pod — +1 life!");
+      } else {
+        this.grantTokens(12, "+12 ◎ (life cap)");
+      }
+      return;
+    }
+    if (type === "clearRow") {
+      this.purgeBottomAlienRow();
+      return;
+    }
+    if (type === "freezeAliens") {
+      this.setTimedBuff("freezeAliens", def.durationSec ?? 3);
+      return;
+    }
+    if (type === "doubleScore") {
+      this.setTimedBuff("doubleScore", def.durationSec ?? 10);
+      return;
+    }
+    if (type === "tokenBurst") {
+      this.grantTokens(8, "+8 ◎ token burst!");
+      return;
+    }
+    if (type === "hyperSpeed") {
+      this.setTimedBuff("hyperSpeed", def.durationSec ?? 5);
+      return;
+    }
+
     this.activePowerUp = type;
     this.powerUpTimer = POWERUP_DURATION;
+    this.pushHudBuffs();
   }
 
   getGunLabel(): string {
@@ -1037,7 +1268,10 @@ export class Game {
       (this.meta.upgrades.includes("comboExtend") ? 0.5 : 0);
     this.comboTimer = comboWindow;
     this.comboCount++;
-    this.comboMult = Math.min(COMBO_MAX, 1 + Math.floor(this.comboCount / 2));
+    this.comboMult = Math.min(
+      COMBO_MAX,
+      Math.max(this.comboAuraUntilHit ? 2 : 1, 1 + Math.floor(this.comboCount / 2))
+    );
     this.challenges.onCombo(this.comboMult);
     this.runMaxCombo = Math.max(this.runMaxCombo, this.comboMult);
     this.callbacks.onComboChange(this.comboCount, this.comboMult);
@@ -1049,7 +1283,8 @@ export class Game {
 
   private addScore(base: number): void {
     const surge = this.scoreSurgeActive ? 1.25 : 1;
-    this.score += Math.round(base * this.comboMult * surge);
+    const pickupSurge = this.getTimedBuff("doubleScore") > 0 ? 2 : 1;
+    this.score += Math.round(base * this.comboMult * surge * pickupSurge);
     this.callbacks.onScoreChange(this.score);
   }
 
@@ -1058,6 +1293,17 @@ export class Game {
     this.levelDamageThisLevel = true;
     this.challenges.onDamage();
     this.levelChallenges.onDamage();
+
+    if (this.aegisUntilHit) {
+      this.aegisUntilHit = false;
+      this.invulnTimer = INVULN_TIME;
+      this.addShake(0.2);
+      this.audio.play("powerup");
+      this.callbacks.onToast("Aegis field absorbed the hit!");
+      this.clearUntilLifeLostBuffs();
+      this.respawnAfterHit();
+      return;
+    }
 
     if (this.pendingLifeBuffer) {
       this.pendingLifeBuffer = false;
@@ -1096,6 +1342,19 @@ export class Game {
     this.bullets = this.bullets.filter((b) => !b.fromPlayer);
     this.canFire = true;
     this.fireCooldown = 0;
+    this.clearUntilLifeLostBuffs();
+    this.gunVolley = "single";
+    this.gunVolleyTimer = 0;
+    this.plasmaTimer = 0;
+    this.cloneTimer = 0;
+    this.activePowerUp = null;
+    this.powerUpTimer = 0;
+  }
+
+  private clearUntilLifeLostBuffs(): void {
+    this.aegisUntilHit = false;
+    this.comboAuraUntilHit = false;
+    this.pushHudBuffs();
   }
 
   resolveSlotResult(outcome: SlotOutcome): void {

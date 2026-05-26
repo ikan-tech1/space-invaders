@@ -55,6 +55,25 @@
   </head>
   <body>
     <div id="app">
+      <div id="splash-overlay" class="splash-overlay hidden" aria-live="polite">
+        <div class="splash-cabinet arcade-cabinet">
+          <div class="arcade-frame" aria-hidden="true">
+            <span class="arcade-corner arcade-corner-tl"></span>
+            <span class="arcade-corner arcade-corner-tr"></span>
+            <span class="arcade-corner arcade-corner-bl"></span>
+            <span class="arcade-corner arcade-corner-br"></span>
+            <span class="arcade-scanlines"></span>
+            <span class="arcade-glow"></span>
+          </div>
+          <p class="splash-eyebrow"><span class="arcade-status-dot"></span> ARCADE ONLINE</p>
+          <h1 class="splash-title"><span class="splash-og">OG</span> SPACE INVADERS</h1>
+          <p class="splash-tagline">Classic Arcade Edition</p>
+          <div class="splash-loader" role="progressbar" aria-label="Loading">
+            <span class="splash-loader-bar"></span>
+          </div>
+          <p class="splash-status">Calibrating cabinet…</p>
+        </div>
+      </div>
       <div id="screen-root"></div>
       <div id="game-layer" class="hidden">
         <div class="crt-bezel">
@@ -98,6 +117,7 @@
           <div id="hud-endless-mult" class="hud-endless hidden">×1.0 ENDLESS</div>
           <div id="hud-boss-weak" class="hud-boss-weak hidden">◎ WEAK POINT</div>
           <div id="hud-combo" class="hud-combo hidden">COMBO x1</div>
+          <div id="hud-buffs" class="hud-buffs hidden" aria-label="Active buffs"></div>
         </div>
         <div id="wave-banner" class="wave-banner hidden"></div>
         <div id="sector-briefing-modal" class="hidden level-complete-overlay"></div>
@@ -116,7 +136,13 @@
             <div class="screen-marquee pause-marquee" aria-hidden="true">
               <span>INSERT COIN TO RESUME</span>
             </div>
-            <p class="pause-hint">P or tap pause to resume</p>
+            <footer class="pause-footer">
+              <button type="button" class="btn btn-primary btn-deploy" id="pause-resume">
+                <span class="btn-deploy-label">Resume</span>
+                <span class="btn-deploy-sub">Continue mission</span>
+              </button>
+              <p class="pause-hint"><kbd>P</kbd> or pause button</p>
+            </footer>
           </div>
         </div>
         <div id="touch-controls">

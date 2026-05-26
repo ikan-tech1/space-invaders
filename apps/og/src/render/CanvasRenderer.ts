@@ -2,6 +2,8 @@ import {
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
   COLORS,
+  getPickupDef,
+  PICKUP_CATEGORY_COLORS,
   SHIELD_CELL,
   SHIELD_COLS,
   SHIELD_ROWS,
@@ -239,20 +241,8 @@ export class CanvasRenderer {
 
   drawPowerUp(p: PowerUpDrop): void {
     if (!p.active) return;
-    const colors: Record<string, string> = {
-      rapid: COLORS.accent,
-      spread: COLORS.magenta,
-      shield: COLORS.shield,
-      slow: COLORS.gold,
-      plasma: "#ff66cc",
-      bunker: "#88aa44",
-      clone: "#cc66ff",
-      twin: "#66ccff",
-      triple: "#aaddff",
-      quint: "#ffaa44",
-      hex: "#ff6622",
-    };
-    const color = colors[p.type] ?? COLORS.accent;
+    const def = getPickupDef(p.type);
+    const color = PICKUP_CATEGORY_COLORS[def.category];
     const bob = Math.sin(Date.now() / 200) * 2;
     drawSprite(
       this.ctx,

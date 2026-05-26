@@ -17,6 +17,44 @@ export type GunVolley =
   | "homing"
   | "shockwave";
 
+/** Volley tier ladder for +1 volley upgrade pickup. */
+export const VOLLEY_TIER_CHAIN: GunVolley[] = [
+  "single",
+  "double",
+  "twin",
+  "burst2",
+  "triple",
+  "burst3",
+  "quint",
+  "scatter",
+  "hex",
+  "homing",
+  "shockwave",
+];
+
+export function bumpVolleyTier(profile: GunVolley): GunVolley {
+  const idx = VOLLEY_TIER_CHAIN.indexOf(profile);
+  if (idx < 0) return profile;
+  return VOLLEY_TIER_CHAIN[Math.min(idx + 1, VOLLEY_TIER_CHAIN.length - 1)]!;
+}
+
+/** Maps timed weapon pickups to volley profiles. */
+export const PICKUP_WEAPON_PROFILE: Partial<Record<string, GunVolley>> = {
+  rapid: "rapid",
+  spread: "spread",
+  plasma: "plasma",
+  twin: "twin",
+  triple: "triple",
+  quint: "quint",
+  hex: "hex",
+  scatter: "scatter",
+  double: "double",
+  burst2: "burst2",
+  burst3: "burst3",
+  homing: "homing",
+  shockwave: "shockwave",
+};
+
 export function createVolley(profile: GunVolley, px: number, py: number): Bullet[] {
   const mk = (
     x: number,

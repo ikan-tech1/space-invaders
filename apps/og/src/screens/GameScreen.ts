@@ -80,6 +80,7 @@ export class GameScreen {
     const hudRunPool = document.getElementById("hud-run-pool")!;
     const hudEndlessMult = document.getElementById("hud-endless-mult")!;
     const hudCombo = document.getElementById("hud-combo")!;
+    const hudBuffs = document.getElementById("hud-buffs")!;
     const hudBossWeak = document.getElementById("hud-boss-weak")!;
     const waveBanner = document.getElementById("wave-banner")!;
     const pauseOverlay = document.getElementById("pause-overlay")!;
@@ -182,6 +183,21 @@ export class GameScreen {
         hudBossWeak.classList.toggle("hidden", !visible);
         if (visible) hudBossWeak.textContent = `◎ ${label}`;
       },
+      onActiveBuffs: (buffs) => {
+        if (!buffs.length) {
+          hudBuffs.classList.add("hidden");
+          hudBuffs.innerHTML = "";
+          return;
+        }
+        hudBuffs.classList.remove("hidden");
+        hudBuffs.innerHTML = buffs
+          .map((b) => {
+            const time =
+              b.remaining < 0 ? "∞" : `${Math.ceil(b.remaining)}s`;
+            return `<span class="hud-buff" title="${b.label}">${b.symbol}<small>${time}</small></span>`;
+          })
+          .join("");
+      },
       onSlotMachine: (ctx) => {
         if (!this.game || !this.audio) return;
         showSlotMachine(this.slotOverlay, this.audio, ctx, (outcome) => {
@@ -242,6 +258,10 @@ export class GameScreen {
         });
       }
     }, 5000);
+
+    document.getElementById("pause-resume")?.addEventListener("click", () => {
+      if (this.game?.state === "paused") this.game.togglePause();
+    });
 
     window.addEventListener("resize", this.onResize);
     this.audio.resume();
