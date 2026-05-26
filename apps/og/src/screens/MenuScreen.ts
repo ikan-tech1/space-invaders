@@ -1,7 +1,8 @@
 import type { Difficulty, GameMode } from "../config";
 import { OG_CHALLENGES } from "../progression/challenges";
 import { EasterEggRegistry } from "../progression/easterEggs";
-import { loadOgMeta } from "../progression/metaStore";
+import { loadOgMeta, saveOgMeta } from "../progression/metaStore";
+import { SHIP_PROFILES } from "../progression/ships";
 import type { LocalStorageRepo } from "../storage/LocalStorageRepo";
 import type { Screen } from "./ScreenRouter";
 
@@ -95,8 +96,18 @@ export class MenuScreen implements Screen {
             </div>
             <div class="arcade-stats">
               <span class="arcade-stat">
+                <span class="arcade-stat-label">Tokens</span>
+                <span class="arcade-stat-value arcade-stat-token">◎ ${meta.tokens}</span>
+              </span>
+              <span class="arcade-stat-divider" aria-hidden="true"></span>
+              <span class="arcade-stat">
                 <span class="arcade-stat-label">Stars</span>
                 <span class="arcade-stat-value arcade-stat-gold">★ ${meta.stars}</span>
+              </span>
+              <span class="arcade-stat-divider" aria-hidden="true"></span>
+              <span class="arcade-stat">
+                <span class="arcade-stat-label">Ship</span>
+                <span class="arcade-stat-value arcade-stat-cyan">${SHIP_PROFILES[meta.equippedShip].name}</span>
               </span>
               <span class="arcade-stat-divider" aria-hidden="true"></span>
               <span class="arcade-stat">
@@ -174,7 +185,7 @@ export class MenuScreen implements Screen {
           <button type="button" class="nav-tile" data-action="armory">
             <span class="nav-tile-icon">⚔</span>
             <span class="nav-tile-label">Armory</span>
-            <span class="nav-tile-meta">${meta.stars} ★</span>
+            <span class="nav-tile-meta">◎ ${meta.tokens}</span>
           </button>
           <button type="button" class="nav-tile" data-action="challenges">
             <span class="nav-tile-icon">◎</span>
@@ -241,10 +252,32 @@ export class MenuScreen implements Screen {
       });
     });
 
+    let toastTimer: ReturnType<typeof setTimeout> | null = null;
+    const showMenuToast = (text: string): void => {
+      let el = root.querySelector(".menu-secret-toast") as HTMLElement | null;
+      if (!el) {
+        el = document.createElement("p");
+        el.className = "menu-secret-toast";
+        root.querySelector(".menu-screen")?.appendChild(el);
+      }
+      el.textContent = text;
+      el.classList.add("menu-secret-toast--visible");
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el?.classList.remove("menu-secret-toast--visible"), 3200);
+    };
+
     const onKey = (e: KeyboardEvent) => {
-      if (this.eggs.onMenuKey(e.key)) {
+      const reward = this.eggs.onMenuKey(e.key);
+      if (!reward) return;
+      if (reward.message.startsWith("KONAMI")) {
         localStorage.setItem("og_konami_pending", "1");
       }
+      if (reward.tokens) {
+        const m = loadOgMeta();
+        m.tokens += reward.tokens;
+        saveOgMeta(m);
+      }
+      showMenuToast(reward.message);
     };
     window.addEventListener("keydown", onKey);
     (root as HTMLElement & { _konamiCleanup?: () => void })._konamiCleanup = () =>

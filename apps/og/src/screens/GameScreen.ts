@@ -66,6 +66,8 @@ export class GameScreen {
     const hudWave = document.getElementById("hud-wave")!;
     const hudLives = document.getElementById("hud-lives")!;
     const hudGun = document.getElementById("hud-gun-name")!;
+    const hudShip = document.getElementById("hud-ship-name")!;
+    const hudTokens = document.getElementById("hud-tokens")!;
     const hudCombo = document.getElementById("hud-combo")!;
     const waveBanner = document.getElementById("wave-banner")!;
     const pauseOverlay = document.getElementById("pause-overlay")!;
@@ -120,11 +122,21 @@ export class GameScreen {
         waveBanner.textContent = "CAMPAIGN CLEARED!";
         waveBanner.classList.remove("hidden");
       },
+      onTokensChange: (t) => {
+        hudTokens.textContent = String(t);
+      },
+      onLoadoutChange: (ship, gun) => {
+        hudShip.textContent = ship;
+        hudGun.textContent = gun;
+      },
       onSlotMachine: (ctx) => {
         if (!this.game || !this.audio) return;
         showSlotMachine(this.slotOverlay, this.audio, ctx, (outcome) => {
           this.game?.resolveSlotResult(outcome);
-          if (this.game) hudGun.textContent = this.game.getGunLabel();
+          if (this.game) {
+            hudGun.textContent = this.game.getGunLabel();
+            hudShip.textContent = this.game.getShipLabel();
+          }
         });
       },
       onGameOver: (score, wave) => {
@@ -141,13 +153,18 @@ export class GameScreen {
     this.game.init(this.deps.difficulty, this.deps.gameMode, continueData);
     if (continueData) this.deps.repo.clearSavedRun();
     hudGun.textContent = this.game.getGunLabel();
+    hudShip.textContent = this.game.getShipLabel();
+    hudTokens.textContent = String(this.game.meta.tokens);
 
     this.maybeShowOnboarding();
 
     this.loop = new GameLoop(
       (dt) => {
         this.game?.update(dt);
-        if (this.game) hudGun.textContent = this.game.getGunLabel();
+        if (this.game) {
+          hudGun.textContent = this.game.getGunLabel();
+          hudShip.textContent = this.game.getShipLabel();
+        }
       },
       () => this.game?.draw()
     );

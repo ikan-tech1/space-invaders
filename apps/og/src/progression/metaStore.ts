@@ -1,23 +1,42 @@
-export type OgMetaUpgrade = "extraLife" | "fastShot" | "shieldRepair";
+import type { ArmoryGunId } from "./armoryGuns";
+import type { ShipId } from "./ships";
+
+export type OgMetaUpgrade =
+  | "extraLife"
+  | "fastShot"
+  | "shieldRepair"
+  | "tokenMagnet"
+  | "comboExtend"
+  | "luckySlot";
 
 export interface OgMeta {
   stars: number;
+  tokens: number;
   endlessUnlocked: boolean;
   campaignCleared: boolean;
   upgrades: OgMetaUpgrade[];
   unlockedPickups: string[];
   badges: string[];
+  equippedShip: ShipId;
+  equippedGun: ArmoryGunId;
+  unlockedShips: ShipId[];
+  unlockedGuns: ArmoryGunId[];
 }
 
 const KEY = "og_meta";
 
 const DEFAULT: OgMeta = {
   stars: 0,
+  tokens: 0,
   endlessUnlocked: false,
   campaignCleared: false,
   upgrades: [],
   unlockedPickups: ["rapid", "spread", "shield", "slow"],
   badges: [],
+  equippedShip: "striker",
+  equippedGun: "single",
+  unlockedShips: ["striker"],
+  unlockedGuns: ["single"],
 };
 
 export function loadOgMeta(): OgMeta {
@@ -37,6 +56,19 @@ function migrateMeta(m: OgMeta): OgMeta {
       .filter((p) => p !== "laser")
       .concat(m.unlockedPickups.includes("plasma") ? [] : ["plasma"]);
   }
+  if (!m.tokens && typeof (m as OgMeta & { coins?: number }).coins === "number") {
+    m.tokens = (m as OgMeta & { coins?: number }).coins ?? 0;
+  }
+  if (!m.equippedShip) m.equippedShip = "striker";
+  if (!m.equippedGun) m.equippedGun = "single";
+  if (!m.unlockedShips?.length) m.unlockedShips = ["striker"];
+  if (!m.unlockedGuns?.length) m.unlockedGuns = ["single"];
+  if (!m.unlockedShips.includes(m.equippedShip)) {
+    m.equippedShip = "striker";
+  }
+  if (!m.unlockedGuns.includes(m.equippedGun)) {
+    m.equippedGun = "single";
+  }
   return m;
 }
 
@@ -48,4 +80,16 @@ export const UPGRADE_COSTS: Record<OgMetaUpgrade, number> = {
   extraLife: 5,
   fastShot: 4,
   shieldRepair: 3,
+  tokenMagnet: 6,
+  comboExtend: 5,
+  luckySlot: 7,
+};
+
+export const UPGRADE_LABELS: Record<OgMetaUpgrade, string> = {
+  extraLife: "Extra life (+1 per run)",
+  fastShot: "Faster first shot",
+  shieldRepair: "Shield repair between levels",
+  tokenMagnet: "+1 token per alien kill",
+  comboExtend: "Combo window +0.5s",
+  luckySlot: "Better slot machine odds",
 };

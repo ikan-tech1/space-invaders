@@ -1446,13 +1446,56 @@ body {
   margin-top: 8px;
 }
 
-.hud-gun {
+.hud-loadout {
   margin-top: 5px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hud-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 10px;
+  min-width: 72px;
+  background: var(--hud-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  backdrop-filter: blur(4px);
+}
+
+.hud-meta-label {
+  font-family: var(--font-pixel);
+  font-size: clamp(0.3rem, 1.6vw, 0.36rem);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.hud-meta-value {
+  font-family: var(--font-mono);
+  font-size: clamp(0.58rem, 2.6vw, 0.68rem);
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.hud-meta-value--gold {
+  color: var(--gold);
+}
+
+.hud-gun {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   padding: 4px 12px;
+  flex: 1;
+  min-width: 140px;
   background: var(--hud-bg);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
@@ -2151,6 +2194,158 @@ body {
 .onboarding-dismiss {
   margin-top: 12px;
   width: 100%;
+}
+
+.arcade-stat-token {
+  color: #7bff6e;
+}
+
+.menu-secret-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + var(--safe-bottom));
+  transform: translateX(-50%) translateY(12px);
+  z-index: 40;
+  padding: 10px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--gold);
+  background: rgba(6, 10, 20, 0.92);
+  border: 1px solid rgba(255, 210, 74, 0.45);
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.menu-secret-toast--visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.armory-wallet {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.armory-wallet-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 232, 245, 0.04);
+}
+
+.armory-wallet-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.armory-wallet-value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.armory-wallet-value--token {
+  color: #7bff6e;
+}
+
+.armory-wallet-value--star {
+  color: var(--gold);
+}
+
+.armory-ship-grid,
+.armory-gun-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.armory-ship-card,
+.armory-gun-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 232, 245, 0.03);
+}
+
+.armory-ship-card {
+  grid-template-columns: 48px 1fr auto;
+  align-items: center;
+}
+
+.armory-ship-card--equipped,
+.armory-gun-card--equipped {
+  border-color: rgba(0, 240, 255, 0.45);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.12);
+}
+
+.armory-ship-silhouette {
+  width: 40px;
+  height: 32px;
+  background: linear-gradient(180deg, transparent 40%, var(--ship-color) 40%, var(--ship-color) 100%);
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+  filter: drop-shadow(0 0 6px var(--ship-color));
+}
+
+.armory-ship-name {
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.armory-ship-tag,
+.armory-gun-desc {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  line-height: 1.35;
+}
+
+.armory-ship-stats {
+  margin: 4px 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--accent);
+}
+
+.armory-gun-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.armory-equipped-badge {
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--shield);
+  padding: 3px 8px;
+  border: 1px solid rgba(61, 255, 138, 0.35);
+  border-radius: 999px;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.72rem;
+}
+
+.btn-token {
+  border-color: rgba(123, 255, 110, 0.4);
+  color: #7bff6e;
+}
+
+.btn-token:disabled {
+  opacity: 0.45;
 }
 
 /* ── Armory pickup list ── */

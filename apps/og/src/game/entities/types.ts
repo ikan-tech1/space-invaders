@@ -11,10 +11,13 @@ export interface Bullet {
   x: number;
   y: number;
   vy: number;
+  vx?: number;
   fromPlayer: boolean;
   spread?: boolean;
   pierce?: boolean;
   plasma?: boolean;
+  homing?: boolean;
+  shockwave?: boolean;
   active: boolean;
 }
 

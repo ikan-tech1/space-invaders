@@ -13,8 +13,10 @@ export function alienRect(a: Alien): Rect {
   return { x: a.x, y: a.y, w: ALIEN_WIDTH, h: ALIEN_HEIGHT };
 }
 
-export function playerRect(px: number, py: number): Rect {
-  return { x: px - PLAYER_W / 2, y: py - PLAYER_H / 2, w: PLAYER_W, h: PLAYER_H };
+export function playerRect(px: number, py: number, scale = 1): Rect {
+  const w = PLAYER_W * scale;
+  const h = PLAYER_H * scale;
+  return { x: px - w / 2, y: py - h / 2, w, h };
 }
 
 export function bossRect(b: Boss): Rect {
@@ -26,6 +28,8 @@ export function ufoRect(u: UFO): Rect {
 }
 
 export function bulletRect(b: Bullet): Rect {
+  if (b.shockwave) return { x: b.x - 9, y: b.y - 9, w: 18, h: 18 };
+  if (b.homing) return { x: b.x - 3, y: b.y - 5, w: 6, h: 10 };
   return { x: b.x - 2, y: b.y - 6, w: 4, h: 12 };
 }
 
@@ -74,7 +78,8 @@ export function checkEnemyBulletHits(
   px: number,
   py: number,
   shields: Shield[],
-  invuln: boolean
+  invuln: boolean,
+  playerScale = 1
 ): "player" | "shield" | null {
   if (!bullet.active || bullet.fromPlayer) return null;
   const br = bulletRect(bullet);
@@ -86,7 +91,7 @@ export function checkEnemyBulletHits(
     }
   }
 
-  if (!invuln && rectsOverlap(br, playerRect(px, py))) {
+  if (!invuln && rectsOverlap(br, playerRect(px, py, playerScale))) {
     bullet.active = false;
     return "player";
   }

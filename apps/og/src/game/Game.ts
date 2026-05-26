@@ -46,9 +46,11 @@ import { loadOgMeta, saveOgMeta, type OgMeta } from "../progression/metaStore";
 import {
   createVolley,
   profileBypassesBulletSlot,
+  profileFireCooldownMult,
   type GunVolley,
   GUN_VOLLEY_LABELS,
 } from "./weaponVolley";
+import { getShipProfile } from "../progression/ships";
 import type { SlotMachineContext, SlotOutcome } from "../ui/slotMachine";
 
 export type GameState =
@@ -71,6 +73,8 @@ export interface GameCallbacks {
   onPauseChange: (paused: boolean) => void;
   onCampaignClear: () => void;
   onSlotMachine: (ctx: SlotMachineContext) => void;
+  onTokensChange: (tokens: number) => void;
+  onLoadoutChange: (ship: string, gun: string) => void;
 }
 
 const BASE_POWERUPS: PowerUpType[] = ["rapid", "spread", "shield", "slow"];
@@ -130,6 +134,7 @@ export class Game {
   eggs: EasterEggRegistry;
 
   levelDamageThisLevel = false;
+  runTokensEarned = 0;
 
   constructor(
     public renderer: CanvasRenderer,
@@ -174,10 +179,36 @@ export class Game {
     if (this.meta.upgrades.includes("shieldRepair")) {
       for (const s of this.shields) patchShield(s);
     }
+    this.runTokensEarned = 0;
     this.startLevel();
     this.callbacks.onLivesChange(this.lives);
     this.callbacks.onScoreChange(this.score);
     this.callbacks.onWaveChange(this.levelDirector.level);
+    this.callbacks.onTokensChange(this.meta.tokens);
+    this.callbacks.onLoadoutChange(this.getShipLabel(), this.getGunLabel());
+  }
+
+  private getShipProfile() {
+    return getShipProfile(this.meta.equippedShip);
+  }
+
+  private grantTokens(amount: number, toast?: string): void {
+    if (amount <= 0) return;
+    this.meta.tokens += amount;
+    this.runTokensEarned += amount;
+    saveOgMeta(this.meta);
+    this.callbacks.onTokensChange(this.meta.tokens);
+    if (toast) this.callbacks.onToast(toast);
+  }
+
+  private handleEggReward(reward: ReturnType<EasterEggRegistry["onScore"]>): void {
+    if (!reward) return;
+    if (reward.tokens) this.grantTokens(reward.tokens);
+    this.callbacks.onToast(reward.message);
+    if (reward.message.includes("Phantom") && !this.meta.unlockedShips.includes("phantom")) {
+      this.meta.unlockedShips.push("phantom");
+      saveOgMeta(this.meta);
+    }
   }
 
   startLevel(): void {
@@ -215,7 +246,7 @@ export class Game {
   update(dt: number): void {
     if (this.state === "gameOver") return;
     this.eggs.update(dt);
-    this.eggs.onScore(this.score);
+    this.handleEggReward(this.eggs.onScore(this.score));
 
     if (this.gunVolleyTimer > 0) {
       this.gunVolleyTimer -= dt;
@@ -301,9 +332,18 @@ export class Game {
     this.shakeTimer = duration;
   }
 
+  private resolveFireProfile(): GunVolley {
+    if (this.plasmaTimer > 0) return "plasma";
+    if (this.gunVolleyTimer > 0) return this.gunVolley;
+    if (this.activePowerUp === "spread") return "spread";
+    if (this.activePowerUp === "rapid") return "rapid";
+    return this.meta.equippedGun as GunVolley;
+  }
+
   private updatePlayer(dt: number): void {
+    const ship = this.getShipProfile();
     const axis = this.input.getMoveAxis();
-    this.playerX += axis * PLAYER_SPEED * dt;
+    this.playerX += axis * PLAYER_SPEED * ship.speedMult * dt;
     this.playerX = Math.max(24, Math.min(CANVAS_WIDTH - 24, this.playerX));
 
     if (this.invulnTimer > 0) this.invulnTimer -= dt;
@@ -312,16 +352,7 @@ export class Game {
     if (this.plasmaTimer > 0) this.plasmaTimer -= dt;
     if (this.cloneTimer > 0) this.cloneTimer -= dt;
 
-    const profile: GunVolley =
-      this.plasmaTimer > 0
-        ? "plasma"
-        : this.gunVolleyTimer > 0
-          ? this.gunVolley
-          : this.activePowerUp === "spread"
-            ? "spread"
-            : this.activePowerUp === "rapid"
-              ? "rapid"
-              : "single";
+    const profile = this.resolveFireProfile();
 
     const rapid = profile === "rapid";
     const plasma = profile === "plasma" || this.plasmaTimer > 0;
@@ -334,7 +365,8 @@ export class Game {
           : bypassSlot
             ? PLAYER_FIRE_COOLDOWN
             : SINGLE_FIRE_DEBOUNCE) *
-      (profile === "hex" || profile === "quint" ? 1.12 : 1) *
+      profileFireCooldownMult(profile) *
+      ship.fireCooldownMult *
       (this.meta.upgrades.includes("fastShot") ? 0.82 : 1) *
       DIFFICULTY_CONFIG[this.difficulty].fireCooldownMult;
     if (this.fireCooldown > 0) this.fireCooldown -= dt;
@@ -345,8 +377,8 @@ export class Game {
 
       this.fireVolley(profile);
       if (this.cloneTimer > 0) {
-        this.bullets.push(...createVolley(profile, this.playerX - 36, this.playerY, false));
-        this.bullets.push(...createVolley(profile, this.playerX + 36, this.playerY, false));
+        this.bullets.push(...createVolley(profile, this.playerX - 36, this.playerY));
+        this.bullets.push(...createVolley(profile, this.playerX + 36, this.playerY));
       }
       this.fireCooldown = cooldown;
       this.audio.play("shoot");
@@ -354,17 +386,57 @@ export class Game {
   }
 
   private fireVolley(profile: GunVolley): void {
-    const volley = createVolley(profile, this.playerX, this.playerY, false);
+    const volley = createVolley(profile, this.playerX, this.playerY);
     for (const b of volley) {
       this.levelChallenges.onShotFired();
       this.bullets.push(b);
     }
     if (!volley.some((b) => b.spread)) this.canFire = false;
+
+    if (profile === "shockwave") {
+      this.addShake(0.14);
+      this.particles.burst(this.playerX, this.playerY - 20, "#7bff6e", 10);
+    } else if (profile === "homing") {
+      this.particles.burst(this.playerX, this.playerY - 18, "#ff2d95", 6);
+    } else if (profile === "scatter" || profile === "plasma") {
+      this.addShake(0.08);
+    }
   }
 
   private updateBullets(dt: number): void {
+    const ship = this.getShipProfile();
     for (const b of this.bullets) {
       if (!b.active) continue;
+
+      if (b.homing && b.fromPlayer) {
+        let targetX = 0;
+        let targetY = 0;
+        let best = Infinity;
+        for (const a of this.aliens) {
+          if (!a.alive) continue;
+          const d = (a.x + 14 - b.x) ** 2 + (a.y + 11 - b.y) ** 2;
+          if (d < best) {
+            best = d;
+            targetX = a.x + 14;
+            targetY = a.y + 11;
+          }
+        }
+        if (this.boss?.active) {
+          const d = (this.boss.x - b.x) ** 2 + (this.boss.y - b.y) ** 2;
+          if (d < best) {
+            targetX = this.boss.x;
+            targetY = this.boss.y;
+          }
+        }
+        if (best < Infinity) {
+          const dx = targetX - b.x;
+          const dy = targetY - b.y;
+          const len = Math.hypot(dx, dy) || 1;
+          b.vx = (b.vx ?? 0) * 0.9 + (dx / len) * 240 * dt;
+        }
+      }
+
+      b.x += (b.vx ?? 0) * dt;
       b.y += b.vy * dt;
       if (b.y < -20 || b.y > CANVAS_HEIGHT + 20) b.active = false;
 
@@ -374,6 +446,7 @@ export class Game {
         if (hit.ufo && this.ufo) {
           this.levelChallenges.onShotHit();
           const pts = this.ufo.points;
+          this.grantTokens(Math.max(2, Math.floor(pts / 40)));
           this.addScore(pts);
           this.particles.burst(this.ufo.x, this.ufo.y, "#ffd24a", 16);
           this.ufo.active = false;
@@ -389,6 +462,7 @@ export class Game {
             this.boss.phase = 2;
           }
           if (this.boss.hp <= 0) {
+            this.grantTokens(this.boss.kind === "mini" ? 8 : 15);
             this.addScore(BOSS_POINTS);
             this.particles.burst(this.boss.x, this.boss.y, "#ff2d95", 24);
             this.boss.active = false;
@@ -398,11 +472,13 @@ export class Game {
         if (hit.alien) {
           this.levelChallenges.onShotHit();
           hit.alien.alive = false;
-          this.eggs.onKill();
+          this.handleEggReward(this.eggs.onKill());
           localStorage.setItem("og_total_kills", String(this.eggs.totalKills));
           if (this.eggs.totalKills >= 100) {
             localStorage.setItem("og_secret_initials", "1");
           }
+          const killTokens = 1 + (this.meta.upgrades.includes("tokenMagnet") ? 1 : 0);
+          this.grantTokens(killTokens);
           this.addScore(ALIEN_POINTS[hit.alien.type] ?? 10);
           this.particles.burst(hit.alien.x + 14, hit.alien.y + 11, "#00f0ff", 10);
           this.audio.play("explosion");
@@ -419,7 +495,8 @@ export class Game {
           this.playerX,
           this.playerY,
           this.shields,
-          this.invulnTimer > 0 || this.eggs.isInvulnBuff()
+          this.invulnTimer > 0 || this.eggs.isInvulnBuff(),
+          ship.hitboxScale
         );
         if (result === "player") this.hitPlayer();
       }
@@ -631,11 +708,12 @@ export class Game {
   }
 
   getGunLabel(): string {
-    if (this.plasmaTimer > 0) return GUN_VOLLEY_LABELS.plasma;
-    if (this.gunVolleyTimer > 0) return GUN_VOLLEY_LABELS[this.gunVolley];
-    if (this.activePowerUp === "rapid") return GUN_VOLLEY_LABELS.rapid;
-    if (this.activePowerUp === "spread") return GUN_VOLLEY_LABELS.spread;
-    return GUN_VOLLEY_LABELS.single;
+    const p = this.resolveFireProfile();
+    return GUN_VOLLEY_LABELS[p];
+  }
+
+  getShipLabel(): string {
+    return this.getShipProfile().name;
   }
 
   private updateCombo(dt: number): void {
@@ -650,7 +728,9 @@ export class Game {
   }
 
   private registerComboKill(): void {
-    this.comboTimer = COMBO_WINDOW;
+    const comboWindow =
+      COMBO_WINDOW + (this.meta.upgrades.includes("comboExtend") ? 0.5 : 0);
+    this.comboTimer = comboWindow;
     this.comboCount++;
     this.comboMult = Math.min(COMBO_MAX, 1 + Math.floor(this.comboCount / 2));
     this.challenges.onCombo(this.comboMult);
@@ -686,6 +766,7 @@ export class Game {
       maxLives: SLOT_MAX_LIVES,
       powerUpPool: this.getAvailablePowerups(),
       isFinalSpin: this.lives <= 0,
+      luckySlot: this.meta.upgrades.includes("luckySlot"),
     });
   }
 
@@ -748,6 +829,9 @@ export class Game {
     }
     this.score += challengeBonus;
     this.meta.stars += stars;
+    const levelTokens = 5 + stars * 3;
+    this.grantTokens(levelTokens);
+    this.handleEggReward(this.eggs.onLevelComplete(this.levelDirector.level));
     this.meta.badges = this.challenges.getCompletedIds();
     if (this.levelDirector.level === 6) this.meta.endlessUnlocked = true;
     if (this.levelDirector.level >= CAMPAIGN_MAX_LEVEL && this.gameMode === "campaign") {
@@ -793,10 +877,11 @@ export class Game {
     renderer.drawBoss(this.boss);
     for (const p of this.powerUps) renderer.drawPowerUp(p);
     renderer.drawBullets(this.bullets);
-    renderer.drawPlayer(this.playerX, this.playerY, this.invulnTimer > 0);
+    const ship = this.getShipProfile();
+    renderer.drawPlayer(this.playerX, this.playerY, this.invulnTimer > 0, ship.color);
     if (this.cloneTimer > 0) {
-      renderer.drawPlayer(this.playerX - 36, this.playerY, true);
-      renderer.drawPlayer(this.playerX + 36, this.playerY, true);
+      renderer.drawPlayer(this.playerX - 36, this.playerY, true, ship.color);
+      renderer.drawPlayer(this.playerX + 36, this.playerY, true, ship.color);
     }
     renderer.drawParticles(particles);
     if (this.shakeTimer > 0) renderer.clearShake();

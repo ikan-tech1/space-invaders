@@ -91,9 +91,9 @@ export class CanvasRenderer {
     }
   }
 
-  drawPlayer(x: number, y: number, invulnBlink: boolean): void {
+  drawPlayer(x: number, y: number, invulnBlink: boolean, shipColor = COLORS.player): void {
     if (invulnBlink && Math.floor(Date.now() / 100) % 2 === 0) return;
-    drawSprite(this.ctx, "player", x - 7, y - 8, COLORS.player, 2);
+    drawSprite(this.ctx, "player", x - 7, y - 8, shipColor, 2);
   }
 
   drawBullets(bullets: Bullet[]): void {
@@ -109,8 +109,31 @@ export class CanvasRenderer {
         this.ctx.shadowBlur = 0;
         continue;
       }
-      const w = b.pierce ? 5 : 4;
-      const h = b.pierce ? 14 : 10;
+      if (b.shockwave) {
+        this.ctx.fillStyle = "rgba(123, 255, 110, 0.55)";
+        this.ctx.shadowColor = "#7bff6e";
+        this.ctx.shadowBlur = 10;
+        this.ctx.beginPath();
+        this.ctx.arc(b.x, b.y, 7, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.shadowBlur = 0;
+        continue;
+      }
+      if (b.homing) {
+        this.ctx.fillStyle = "#ff2d95";
+        this.ctx.shadowColor = "#ff2d95";
+        this.ctx.shadowBlur = 6;
+        this.ctx.beginPath();
+        this.ctx.moveTo(b.x, b.y - 5);
+        this.ctx.lineTo(b.x + 4, b.y + 4);
+        this.ctx.lineTo(b.x - 4, b.y + 4);
+        this.ctx.closePath();
+        this.ctx.fill();
+        this.ctx.shadowBlur = 0;
+        continue;
+      }
+      const w = 4;
+      const h = 10;
       this.ctx.fillStyle = b.fromPlayer ? COLORS.accent : COLORS.danger;
       if (b.fromPlayer) {
         this.ctx.shadowColor = COLORS.accent;

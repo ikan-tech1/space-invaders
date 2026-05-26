@@ -6,8 +6,12 @@ import {
   loadOgMeta,
   saveOgMeta,
   UPGRADE_COSTS,
+  UPGRADE_LABELS,
   type OgMetaUpgrade,
 } from "../progression/metaStore";
+import { ARMORY_GUNS, type ArmoryGunId } from "../progression/armoryGuns";
+import { SHIP_PROFILES, type ShipId } from "../progression/ships";
+import { GUN_VOLLEY_LABELS } from "../game/weaponVolley";
 import { POWERUP_LABELS, type PowerUpType } from "../config";
 
 function renderSubHeader(title: string, subtitle: string, marquee = "— ARCADE MENU —"): string {
@@ -112,7 +116,8 @@ export function createHowToPlayScreen(onBack: () => void): Screen {
             <p><strong>Power-ups:</strong> Rapid, spread, shield, slow, nova plasma, bunker, clone (unlock via challenges).</p>
             <p><strong>Combo:</strong> Chain kills within 2 seconds for score multipliers.</p>
             <p><strong>Stars:</strong> Earn 1–3 stars per level; spend stars in the Armory.</p>
-            <p><strong>Secrets:</strong> Konami code on title, score 8008, 100 total kills.</p>
+            <p><strong>Tokens:</strong> Earn coins from kills and level clears; spend in the Armory on ships, guns, and upgrades.</p>
+            <p><strong>Secrets:</strong> Konami on title, type COIN on menu, score 1337 / 8008 / 50k, kill milestones 50 &amp; 250.</p>
           </section>
           <button type="button" class="btn btn-primary" data-back>Main Menu</button>
         </div>
@@ -158,17 +163,68 @@ export function createArmoryScreen(onBack: () => void): Screen {
     id: "armory",
     mount(root) {
       const meta = loadOgMeta();
-      const upgrades: { id: OgMetaUpgrade; label: string }[] = [
-        { id: "extraLife", label: "Extra life (+1)" },
-        { id: "fastShot", label: "Faster first shot" },
-        { id: "shieldRepair", label: "Shield repair between levels" },
-      ];
-      const rows = upgrades
-        .map((u) => {
-          const owned = meta.upgrades.includes(u.id);
-          const cost = UPGRADE_COSTS[u.id];
-          return `<button type="button" class="btn btn-upgrade" data-up="${u.id}" ${owned ? "disabled" : ""}>
-            <span>${u.label}</span>
+      const equippedShip = meta.equippedShip;
+      const equippedGun = meta.equippedGun;
+
+      const shipCards = (Object.keys(SHIP_PROFILES) as ShipId[])
+        .map((id) => {
+          const s = SHIP_PROFILES[id];
+          const owned = meta.unlockedShips.includes(id);
+          const equipped = equippedShip === id;
+          const speedPct = Math.round(s.speedMult * 100);
+          const firePct = Math.round(s.fireCooldownMult * 100);
+          return `
+          <article class="armory-ship-card ${equipped ? "armory-ship-card--equipped" : ""}" data-ship="${id}">
+            <div class="armory-ship-silhouette" style="--ship-color:${s.color}" aria-hidden="true"></div>
+            <div class="armory-ship-info">
+              <h3 class="armory-ship-name">${s.name}</h3>
+              <p class="armory-ship-tag">${s.tagline}</p>
+              <p class="armory-ship-stats">Speed ${speedPct}% · Fire ${firePct}% · Hull ${Math.round(s.hitboxScale * 100)}%</p>
+            </div>
+            <div class="armory-ship-actions">
+              ${
+                equipped
+                  ? '<span class="armory-equipped-badge">Equipped</span>'
+                  : owned
+                    ? `<button type="button" class="btn btn-sm" data-equip-ship="${id}">Equip</button>`
+                    : `<button type="button" class="btn btn-sm btn-token" data-buy-ship="${id}" ${meta.tokens < s.tokenCost ? "disabled" : ""}>
+                        ${s.tokenCost === 0 ? "Free" : `Unlock ${s.tokenCost} ◎`}
+                      </button>`
+              }
+            </div>
+          </article>`;
+        })
+        .join("");
+
+      const gunCards = ARMORY_GUNS.map((g) => {
+        const owned = meta.unlockedGuns.includes(g.id);
+        const equipped = equippedGun === g.id;
+        const label = GUN_VOLLEY_LABELS[g.id];
+        return `
+        <article class="armory-gun-card ${equipped ? "armory-gun-card--equipped" : ""}" data-gun="${g.id}">
+          <div class="armory-gun-head">
+            <strong>${label}</strong>
+            ${equipped ? '<span class="armory-equipped-badge">Equipped</span>' : ""}
+          </div>
+          <p class="armory-gun-desc">${g.description}</p>
+          ${
+            equipped
+              ? ""
+              : owned
+                ? `<button type="button" class="btn btn-sm" data-equip-gun="${g.id}">Equip</button>`
+                : `<button type="button" class="btn btn-sm btn-token" data-buy-gun="${g.id}" ${meta.tokens < g.tokenCost ? "disabled" : ""}>
+                    ${g.tokenCost === 0 ? "Free" : `Unlock ${g.tokenCost} ◎`}
+                  </button>`
+          }
+        </article>`;
+      }).join("");
+
+      const upgradeRows = (Object.keys(UPGRADE_COSTS) as OgMetaUpgrade[])
+        .map((id) => {
+          const owned = meta.upgrades.includes(id);
+          const cost = UPGRADE_COSTS[id];
+          return `<button type="button" class="btn btn-upgrade" data-up="${id}" ${owned ? "disabled" : ""}>
+            <span>${UPGRADE_LABELS[id]}</span>
             <span class="btn-upgrade-cost">${owned ? "Owned" : `${cost} ★`}</span>
           </button>`;
         })
@@ -183,20 +239,96 @@ export function createArmoryScreen(onBack: () => void): Screen {
           </li>`
         )
         .join("");
+
       root.innerHTML = `
-        <div class="screen sub-screen">
-          ${renderSubHeader("Armory", `★ ${meta.stars} available`, "— UPGRADES —")}
+        <div class="screen sub-screen armory-screen">
+          ${renderSubHeader("Armory", "Hangar · loadout · upgrades", "— INSERT COIN —")}
+          <div class="armory-wallet panel cabinet-panel">
+            <div class="armory-wallet-stat">
+              <span class="armory-wallet-label">Tokens</span>
+              <span class="armory-wallet-value armory-wallet-value--token">◎ ${meta.tokens}</span>
+            </div>
+            <div class="armory-wallet-stat">
+              <span class="armory-wallet-label">Stars</span>
+              <span class="armory-wallet-value armory-wallet-value--star">★ ${meta.stars}</span>
+            </div>
+            <div class="armory-wallet-stat">
+              <span class="armory-wallet-label">Ship</span>
+              <span class="armory-wallet-value">${SHIP_PROFILES[equippedShip].name}</span>
+            </div>
+            <div class="armory-wallet-stat">
+              <span class="armory-wallet-label">Gun</span>
+              <span class="armory-wallet-value">${GUN_VOLLEY_LABELS[equippedGun]}</span>
+            </div>
+          </div>
           <section class="panel cabinet-panel">
-            <h2 class="panel-label">Upgrades</h2>
-            <div class="upgrade-list">${rows}</div>
+            <h2 class="panel-label">Ship hangar</h2>
+            <div class="armory-ship-grid">${shipCards}</div>
+          </section>
+          <section class="panel cabinet-panel">
+            <h2 class="panel-label">Weapon rack</h2>
+            <div class="armory-gun-grid">${gunCards}</div>
+          </section>
+          <section class="panel cabinet-panel">
+            <h2 class="panel-label">Star upgrades</h2>
+            <div class="upgrade-list">${upgradeRows}</div>
           </section>
           <section class="panel cabinet-panel panel-flush">
-            <h2 class="panel-label">Unlocked pickups</h2>
+            <h2 class="panel-label">Run pickups unlocked</h2>
             <ul class="armory-pickup-list">${pickupRows}</ul>
-            <p class="armory-hint">Clear challenges to unlock more power-ups in runs.</p>
+            <p class="armory-hint">Earn tokens from kills &amp; levels. Stars buy passive upgrades. No rail / pierce weapons.</p>
           </section>
           <button type="button" class="btn btn-primary" data-back>Main Menu</button>
         </div>`;
+
+      const refresh = (): void => createArmoryScreen(onBack).mount(root);
+
+      root.querySelectorAll("[data-buy-ship]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = (btn as HTMLElement).dataset.buyShip as ShipId;
+          const m = loadOgMeta();
+          const cost = SHIP_PROFILES[id].tokenCost;
+          if (m.unlockedShips.includes(id) || m.tokens < cost) return;
+          m.tokens -= cost;
+          m.unlockedShips.push(id);
+          m.equippedShip = id;
+          saveOgMeta(m);
+          refresh();
+        });
+      });
+      root.querySelectorAll("[data-equip-ship]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = (btn as HTMLElement).dataset.equipShip as ShipId;
+          const m = loadOgMeta();
+          if (!m.unlockedShips.includes(id)) return;
+          m.equippedShip = id;
+          saveOgMeta(m);
+          refresh();
+        });
+      });
+      root.querySelectorAll("[data-buy-gun]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = (btn as HTMLElement).dataset.buyGun as ArmoryGunId;
+          const m = loadOgMeta();
+          const def = ARMORY_GUNS.find((g) => g.id === id)!;
+          if (m.unlockedGuns.includes(id) || m.tokens < def.tokenCost) return;
+          m.tokens -= def.tokenCost;
+          m.unlockedGuns.push(id);
+          m.equippedGun = id;
+          saveOgMeta(m);
+          refresh();
+        });
+      });
+      root.querySelectorAll("[data-equip-gun]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = (btn as HTMLElement).dataset.equipGun as ArmoryGunId;
+          const m = loadOgMeta();
+          if (!m.unlockedGuns.includes(id)) return;
+          m.equippedGun = id;
+          saveOgMeta(m);
+          refresh();
+        });
+      });
       root.querySelectorAll("[data-up]").forEach((btn) => {
         btn.addEventListener("click", () => {
           const id = (btn as HTMLElement).dataset.up as OgMetaUpgrade;
@@ -206,7 +338,7 @@ export function createArmoryScreen(onBack: () => void): Screen {
           m.stars -= cost;
           m.upgrades.push(id);
           saveOgMeta(m);
-          createArmoryScreen(onBack).mount(root);
+          refresh();
         });
       });
       root.querySelector("[data-back]")?.addEventListener("click", onBack);

@@ -9,39 +9,66 @@ export type GunVolley =
   | "hex"
   | "spread"
   | "plasma"
-  | "rapid";
+  | "rapid"
+  | "double"
+  | "scatter"
+  | "burst2"
+  | "burst3"
+  | "homing"
+  | "shockwave";
 
-export function createVolley(
-  profile: GunVolley,
-  px: number,
-  py: number,
-  _pierce: boolean
-): Bullet[] {
-  const mk = (x: number, y: number, spread = false, plasma = false): Bullet => ({
+export function createVolley(profile: GunVolley, px: number, py: number): Bullet[] {
+  const mk = (
+    x: number,
+    y: number,
+    opts: Partial<Pick<Bullet, "spread" | "plasma" | "homing" | "shockwave" | "vy">> = {}
+  ): Bullet => ({
     x,
     y,
-    vy: plasma ? -BULLET_SPEED * 1.08 : -BULLET_SPEED,
+    vy: opts.vy ?? -BULLET_SPEED,
     fromPlayer: true,
-    spread,
+    spread: opts.spread ?? false,
     active: true,
     pierce: false,
-    plasma,
+    plasma: opts.plasma ?? false,
+    homing: opts.homing ?? false,
+    shockwave: opts.shockwave ?? false,
   });
 
   switch (profile) {
+    case "double":
+      return [mk(px - 6, py - 16), mk(px + 6, py - 14)];
     case "twin":
       return [mk(px - 8, py - 16), mk(px + 8, py - 16)];
     case "triple":
-      return [mk(px, py - 16), mk(px - 14, py - 14, true), mk(px + 14, py - 14, true)];
+      return [mk(px, py - 16), mk(px - 14, py - 14, { spread: true }), mk(px + 14, py - 14, { spread: true })];
     case "quint":
-      return [-24, -12, 0, 12, 24].map((o) => mk(px + o, py - 16, o !== 0));
+      return [-24, -12, 0, 12, 24].map((o) => mk(px + o, py - 16, { spread: o !== 0 }));
     case "hex":
-      return [-30, -18, -6, 6, 18, 30].map((o) => mk(px + o, py - 16, o !== 0));
+      return [-30, -18, -6, 6, 18, 30].map((o) => mk(px + o, py - 16, { spread: o !== 0 }));
+    case "scatter":
+      return [-28, -14, 0, 14, 28].map((o) =>
+        mk(px + o, py - 15 + Math.abs(o) * 0.04, { spread: true, vy: -BULLET_SPEED * (0.92 + Math.abs(o) * 0.002) })
+      );
     case "spread":
-      return [mk(px, py - 16), mk(px - 20, py - 14, true), mk(px + 20, py - 14, true)];
+      return [mk(px, py - 16), mk(px - 20, py - 14, { spread: true }), mk(px + 20, py - 14, { spread: true })];
     case "plasma":
       return [-32, -16, 0, 16, 32].map((o) =>
-        mk(px + o, py - 16 + Math.abs(o) * 0.06, true, true)
+        mk(px + o, py - 16 + Math.abs(o) * 0.06, { spread: true, plasma: true })
+      );
+    case "burst2":
+      return [mk(px - 4, py - 16), mk(px + 4, py - 15, { spread: true })];
+    case "burst3":
+      return [mk(px, py - 16), mk(px - 10, py - 15, { spread: true }), mk(px + 10, py - 15, { spread: true })];
+    case "homing":
+      return [
+        mk(px, py - 16, { homing: true }),
+        mk(px - 12, py - 14, { homing: true, spread: true }),
+        mk(px + 12, py - 14, { homing: true, spread: true }),
+      ];
+    case "shockwave":
+      return [-20, -10, 0, 10, 20].map((o) =>
+        mk(px + o, py - 10, { shockwave: true, vy: -BULLET_SPEED * 0.55, spread: true })
       );
     case "rapid":
       return [mk(px, py - 16)];
@@ -56,20 +83,54 @@ export function profileBypassesBulletSlot(profile: GunVolley): boolean {
     profile === "rapid" ||
     profile === "plasma" ||
     profile === "spread" ||
+    profile === "scatter" ||
     profile === "twin" ||
     profile === "triple" ||
     profile === "quint" ||
-    profile === "hex"
+    profile === "hex" ||
+    profile === "double" ||
+    profile === "burst2" ||
+    profile === "burst3" ||
+    profile === "homing" ||
+    profile === "shockwave"
   );
+}
+
+export function profileFireCooldownMult(profile: GunVolley): number {
+  switch (profile) {
+    case "rapid":
+      return 1;
+    case "plasma":
+      return 1;
+    case "hex":
+    case "quint":
+      return 1.12;
+    case "shockwave":
+      return 1.35;
+    case "homing":
+      return 1.2;
+    case "burst3":
+      return 1.15;
+    case "scatter":
+      return 1.08;
+    default:
+      return 1;
+  }
 }
 
 export const GUN_VOLLEY_LABELS: Record<GunVolley, string> = {
   single: "Solo Cannon",
+  double: "Double Fire",
   twin: "Twin Blasters",
   triple: "Triple Burst",
   quint: "Quint Salvo",
   hex: "Hex Storm",
   spread: "Spread Array",
+  scatter: "Scatter Fan",
   plasma: "Nova Plasma",
   rapid: "Rapid Pulse",
+  burst2: "Burst Mk-II",
+  burst3: "Burst Mk-III",
+  homing: "Seeker Pods",
+  shockwave: "Shockwave",
 };

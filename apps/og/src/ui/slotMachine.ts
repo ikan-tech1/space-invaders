@@ -17,6 +17,7 @@ export interface SlotMachineContext {
   maxLives: number;
   powerUpPool: PowerUpType[];
   isFinalSpin: boolean;
+  luckySlot?: boolean;
 }
 
 type ReelSymbol = "life" | "miss" | PowerUpType;
@@ -37,8 +38,9 @@ const FILLER: ReelSymbol[] = [
 function rollOutcome(ctx: SlotMachineContext): SlotOutcome {
   const canWinLife = ctx.lives < ctx.maxLives;
   const canWinPower = ctx.powerUpPool.length > 0;
-  const lifeChance = canWinLife ? SLOT_LIFE_CHANCE : 0;
-  const powerChance = canWinPower ? SLOT_POWERUP_CHANCE : 0;
+  const luck = ctx.luckySlot ? 1.35 : 1;
+  const lifeChance = canWinLife ? SLOT_LIFE_CHANCE * luck : 0;
+  const powerChance = canWinPower ? SLOT_POWERUP_CHANCE * luck : 0;
   const roll = Math.random();
 
   if (roll < lifeChance) return { type: "life" };
