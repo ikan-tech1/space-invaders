@@ -292,10 +292,11 @@ export class MenuScreen implements Screen {
                 })}
                 ${renderMenuNavTile({
                   action: "armory",
-                  icon: "⚔",
+                  icon: "⊕",
                   title: "Armory",
                   shortLabel: "Armory",
                   subtitle: shipProfile.name,
+                  extraClass: "menu-nav-tile--armory",
                 })}
                 ${renderMenuNavTile({
                   action: "challenges",
@@ -325,7 +326,7 @@ export class MenuScreen implements Screen {
                   action: "settings",
                   icon: "⚙",
                   title: "Settings",
-                  shortLabel: "Settings",
+                  shortLabel: "Set",
                   subtitle: "Audio · controls",
                 })}
               </nav>
